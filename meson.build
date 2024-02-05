@@ -1,3 +1,4 @@
 project('prosperity', 'c')
 subdir('src')
-executable('prosperity', server_sources)
+openssl_dep = dependency('openssl')
+executable('prosperity', server_sources, dependencies : [openssl_dep] )
