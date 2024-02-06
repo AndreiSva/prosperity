@@ -9,10 +9,8 @@
 #include "parsing.h"
 #include "server.h"
 
-#ifndef SERVER_DEFAULT_PORT
-const int DEFAULT_PORT = 5757;
-#else
-const int DEFAULT_PORT = SERVER_DEFAULT_PORT;
+#ifndef DEFAULT_PORT
+#define DEFAULT_PORT 5757
 #endif
 
 static void print_usage(char* progname) {
