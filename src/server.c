@@ -1,5 +1,8 @@
 #include "server.h"
 
+#define MAX_EVENTS 10
+#define MAX_RETRY 3
+
 serverClient* clientTable_get(clientTable table, int socketfd) {
 	return table.clients[socketfd];
 }
@@ -52,9 +55,42 @@ int serverInstance_event_loop(serverOptions options) {
 		return EXIT_FAILURE;
 	}
 
+	if (listen(main_instance.server_sockfd, MAX_RETRY) == -1) {
+		perror("server listen failed");
+		return EXIT_FAILURE;
+	}
+
 	int epollfd = epoll_create1(0);
+	if (epollfd == -1) {
+		perror("epoll_create1 failed");
+		return EXIT_FAILURE;
+	}
+	
+	struct epoll_event target_event = {
+		.events = EPOLLIN,
+		.data.fd = main_instance.server_sockfd
+	};
+
+	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, main_instance.server_sockfd, &target_event) == -1) {
+		perror("initial epoll_ctl failed");	
+		return EXIT_FAILURE;
+	} 
+	
+	struct epoll_event events[MAX_EVENTS];
 	while (main_instance.running) {
-		
+		int ready_fds = epoll_wait(epollfd, events, MAX_EVENTS, -1);	
+		if (ready_fds == -1) {
+			perror("epoll_wait failed");
+			return EXIT_FAILURE;
+		}
+
+		for (int i = 0; i < MAX_EVENTS; i++) {
+			if (events[i].data.fd == main_instance.server_sockfd) {
+				// accept a new connection
+			} else {
+				// recieve / send data
+			}
+		}
 	}
 	
 	close(epollfd);

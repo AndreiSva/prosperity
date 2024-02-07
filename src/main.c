@@ -27,7 +27,6 @@ int main(int argc, char** argv) {
 	while (true) {
 		int option_index = 0;
 		static struct option cli_options[] = {
-			{"config" , required_argument, 0, 0},
 			{"port"   , required_argument, 0, 0},
 			{"cert"   , required_argument, 0, 0},
 			{"key"    , required_argument, 0, 0},
@@ -60,10 +59,10 @@ int main(int argc, char** argv) {
 		}
 	}
 	
-	if (server_options.config_path == NULL) {
-		print_usage(argv[0]);
-		exit(EXIT_FAILURE);
-	}
+	// if (server_options.config_path == NULL) {
+	// 	print_usage(argv[0]);
+	// 	exit(EXIT_FAILURE);
+	// }
 	
 	int exit_code = serverInstance_event_loop(server_options);
 	return exit_code;
