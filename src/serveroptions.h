@@ -4,6 +4,9 @@
 typedef struct {
 	int port;
 	char* config_path;
+
+	char* cert_path;
+	char* key_path;
 } serverOptions;
 
 #endif

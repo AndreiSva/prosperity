@@ -29,6 +29,8 @@ int main(int argc, char** argv) {
 		static struct option cli_options[] = {
 			{"config" , required_argument, 0, 0},
 			{"port"   , required_argument, 0, 0},
+			{"cert"   , required_argument, 0, 0},
+			{"key"    , required_argument, 0, 0},
 			{"help"   , no_argument      , 0, 0},
 			{"version", no_argument      , 0, 0},
 			{0        , 0                , 0, 0}
@@ -50,6 +52,10 @@ int main(int argc, char** argv) {
 						exit(EXIT_FAILURE);
 					}
 					server_options.port = atoi(optarg);
+				} else if (strcmp(current_option.name, "cert") == 0) {
+					server_options.cert_path = optarg;
+				} else if (strcmp(current_option.name, "key") == 0) {
+					server_options.key_path = optarg;
 				}
 		}
 	}

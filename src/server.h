@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <openssl/ssl.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 #include "serveroptions.h"
 
@@ -32,7 +34,8 @@ typedef struct {
 typedef struct {
 	int server_sockfd;
 	serverFeed rootfeed;
-
+	
+	int port;
 	bool running;
 } serverInstance;
 
