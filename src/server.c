@@ -19,6 +19,7 @@ static serverInstance serverInstance_init(serverOptions options) {
 		.server_sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0),
 		.port = options.port,
 		.running = true,
+		.sslctx = NULL,
 		.rootfeed = {
 			.clients = NULL,
 			.num_clients = 0,
@@ -33,32 +34,43 @@ static serverInstance serverInstance_init(serverOptions options) {
 }
 
 static void serverInstance_cleanup(serverInstance* server_instance) {
-	
+	SSL_CTX_free(server_instance->sslctx);
+}
+
+static SSL_CTX* serverInstance_initSSL(serverInstance* server_instance, char* cert_path, char* key_path) {
+	SSL_library_init();
+	SSL_CTX* ctx = SSL_CTX_new(SSLv23_server_method());
+	SSL_CTX_use_certificate_file(ctx, cert_path, SSL_FILETYPE_PEM);
+	SSL_CTX_use_PrivateKey_file(ctx, key_path, SSL_FILETYPE_PEM);
+	return ctx;
+}
+
+static void serverInstance_setup(serverInstance* server_instance, serverOptions options) {
+	struct sockaddr_in address = {
+		.sin_addr.s_addr = INADDR_ANY,
+		.sin_port = htons(server_instance->port),
+		.sin_family = AF_INET,
+	};
+
+	if (bind(server_instance->server_sockfd, (struct sockaddr*) &address, sizeof(address)) == -1) {
+		perror("server bind failed");
+		exit(EXIT_FAILURE);
+	}
+
+	if (listen(server_instance->server_sockfd, MAX_RETRY) == -1) {
+		perror("server listen failed");
+		exit(EXIT_FAILURE);
+	}
+
+	server_instance->sslctx = serverInstance_initSSL(
+			server_instance, options.cert_path,
+			options.key_path
+	);
 }
 
 int serverInstance_event_loop(serverOptions options) {
 	serverInstance main_instance = serverInstance_init(options);
-
-	SSL_library_init();
-	SSL_CTX* ctx = SSL_CTX_new(SSLv23_server_method());
-	SSL_CTX_use_certificate_file(ctx, options.cert_path, SSL_FILETYPE_PEM);
-	SSL_CTX_use_PrivateKey_file(ctx, options.key_path, SSL_FILETYPE_PEM);
-	
-	struct sockaddr_in address = {
-		.sin_addr.s_addr = INADDR_ANY,
-		.sin_port = htons(main_instance.port),
-		.sin_family = AF_INET,
-	};
-
-	if (bind(main_instance.server_sockfd, (struct sockaddr*) &address, sizeof(address)) == -1) {
-		perror("server bind failed");
-		return EXIT_FAILURE;
-	}
-
-	if (listen(main_instance.server_sockfd, MAX_RETRY) == -1) {
-		perror("server listen failed");
-		return EXIT_FAILURE;
-	}
+	serverInstance_setup(&main_instance, options);
 
 	int epollfd = epoll_create1(0);
 	if (epollfd == -1) {

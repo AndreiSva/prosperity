@@ -35,6 +35,7 @@ typedef struct {
 	int server_sockfd;
 	serverFeed rootfeed;
 	
+	SSL_CTX* sslctx;
 	int port;
 	bool running;
 } serverInstance;
