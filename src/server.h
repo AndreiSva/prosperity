@@ -9,12 +9,14 @@
 #include <openssl/ssl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include "serveroptions.h"
 
 typedef struct {
 	int client_sockfd;
 	struct sockaddr_in address;
+	socklen_t addrlen;
 } serverClient;
 
 typedef struct serverFeed {
@@ -34,14 +36,17 @@ typedef struct {
 typedef struct {
 	int server_sockfd;
 	serverFeed rootfeed;
+	clientTable client_table;
 	
 	SSL_CTX* sslctx;
+	int epollfd;
+
 	int port;
 	bool running;
 } serverInstance;
 
-void clientTable_index(clientTable table, serverClient* client);
-serverClient* clientTable_get(clientTable table, int socketfd);
+void clientTable_index(clientTable* table, serverClient* client);
+serverClient* clientTable_get(clientTable* table, int socketfd);
 
 int serverInstance_event_loop(serverOptions options);
 
