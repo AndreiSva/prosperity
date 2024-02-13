@@ -10,6 +10,7 @@ typedef struct {
 	uint32_t cols;
 	uint32_t rows;
 
+	// table[col][row]
 	char*** table;
 } CSValue;
 

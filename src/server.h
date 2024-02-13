@@ -19,9 +19,17 @@ typedef struct {
 	socklen_t addrlen;
 } serverClient;
 
+typedef struct {
+	char symbol;
+	bool inherit;
+} serverFlag;
+
 typedef struct serverFeed {
 	serverClient* clients;
 	uint64_t num_clients;
+
+	serverFlag* flags;
+	uint32_t num_flags;
 	
 	struct serverFeed* parent_feed;
 	struct serverFeed* subfeeds;
@@ -30,7 +38,7 @@ typedef struct serverFeed {
 
 typedef struct {
 	serverClient** clients;
-	int max_client;
+	uint32_t max_client;
 } clientTable;
 
 typedef struct {

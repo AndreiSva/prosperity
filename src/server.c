@@ -39,13 +39,19 @@ static serverInstance serverInstance_init(serverOptions options) {
 }
 
 static void serverInstance_cleanup(serverInstance* server_instance) {
+	// free the clients and close the client sockets
+	for (int i = 0; i < server_instance->client_table.max_client; i++) {
+		close(server_instance->client_table.clients[i]->client_sockfd);
+		free(server_instance->client_table.clients[i]);
+	}
+
 	SSL_CTX_free(server_instance->sslctx);
 	close(server_instance->epollfd);
 }
 
 static SSL_CTX* serverInstance_initSSL(serverInstance* server_instance, char* cert_path, char* key_path) {
 	SSL_library_init();
-	SSL_CTX* ctx = SSL_CTX_new(SSLv23_server_method());
+	SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
 	SSL_CTX_use_certificate_file(ctx, cert_path, SSL_FILETYPE_PEM);
 	SSL_CTX_use_PrivateKey_file(ctx, key_path, SSL_FILETYPE_PEM);
 	return ctx;
@@ -119,6 +125,16 @@ static int serverInstance_accept_connection(
 		perror("epoll_ctl failed on client socket");
 		return -1;
 	}
+
+	// perform TLS handshake
+	SSL* ssl_object = SSL_new(server_instance->sslctx);
+	SSL_set_fd(ssl_object, client_sockfd);
+	if (SSL_accept(ssl_object) == -1) {
+		perror("TLS handshake failed");
+		return -1;
+	}
+	
+
 	return client_sockfd;
 }
 
@@ -147,6 +163,8 @@ int serverInstance_event_loop(serverOptions options) {
 				if (client_sockfd == -1) {
 					break;
 				}
+
+				puts("client accepted");
 
 				// now we can create a new client object and add it to the root feed
 				serverClient* new_client = malloc(sizeof(serverClient));
