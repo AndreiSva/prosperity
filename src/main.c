@@ -8,6 +8,7 @@
 #include "serveroptions.h"
 #include "parsing.h"
 #include "server.h"
+#include "logging.h"
 
 #ifndef DEFAULT_PORT
 #define DEFAULT_PORT 5757
@@ -63,7 +64,8 @@ int main(int argc, char** argv) {
 	// 	print_usage(argv[0]);
 	// 	exit(EXIT_FAILURE);
 	// }
-	
+
+	server_LOG("Starting Server...");
 	int exit_code = serverInstance_event_loop(server_options);
 	return exit_code;
 }
