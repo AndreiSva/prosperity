@@ -6,13 +6,11 @@ const int MAX_TIME_STRING_SIZE = 64;
 
 char* server_get_logstr(int* log_string_length) {
 	time_t t = time(NULL);
-	struct tm* time_info = localtime(&t);
-
 	char time_str[MAX_TIME_STRING_SIZE];
-	int time_string_length = strftime(time_str, MAX_TIME_STRING_SIZE, "%D-%r", time_info);
+	int time_string_length = strftime(time_str, MAX_TIME_STRING_SIZE, "%D-%X", localtime(&t));
 	
-	char* log_str = malloc(time_string_length + 256);
-	*log_string_length = sprintf(log_str, "%s: ", time_str);
+	char* log_str = malloc(time_string_length + 3);
+	*log_string_length = sprintf(log_str, "%s> ", time_str);
 
 	return log_str;
 }
@@ -26,4 +24,10 @@ void server_LOG(char* info_str) {
 
 	printf("%s\n", output_string);
 	free(log_str);
+}
+
+void server_DEBUG(serverInstance* server_instance, char* debug_str) {
+	if (server_instance->debug_mode) {
+		server_LOG(debug_str);
+	}
 }

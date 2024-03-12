@@ -15,13 +15,17 @@
 #endif
 
 static void print_usage(char* progname) {
-	fprintf(stderr, "Usage: %s --config path/to/config.json [--port n]\n", progname);
+	fprintf(stderr, "Usage: %s --key <KeyFile.pem> --cert <CertFile.pem> [--port n]\n", progname);
 }
 
 int main(int argc, char** argv) {
 	serverOptions server_options = {
 		.port = DEFAULT_PORT,
-		.config_path = NULL
+		.config_path = NULL,
+		.debug_mode = false,
+
+		.cert_path = NULL,
+		.key_path = NULL,
 	};
 
 	// parse cli flags
@@ -33,6 +37,7 @@ int main(int argc, char** argv) {
 			{"key"    , required_argument, 0, 0},
 			{"help"   , no_argument      , 0, 0},
 			{"version", no_argument      , 0, 0},
+			{"debug"  , no_argument      , 0, 0},
 			{0        , 0                , 0, 0}
 		};
 
@@ -56,14 +61,16 @@ int main(int argc, char** argv) {
 					server_options.cert_path = optarg;
 				} else if (strcmp(current_option.name, "key") == 0) {
 					server_options.key_path = optarg;
+				} else if (strcmp(current_option.name, "debug") == 0) {
+					server_options.debug_mode = true;
 				}
 		}
 	}
-	
-	// if (server_options.config_path == NULL) {
-	// 	print_usage(argv[0]);
-	// 	exit(EXIT_FAILURE);
-	// }
+
+	if (server_options.key_path == NULL || server_options.cert_path == NULL) {
+		print_usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
 
 	server_LOG("Starting Server...");
 	int exit_code = serverInstance_event_loop(server_options);

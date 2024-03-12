@@ -14,9 +14,9 @@
 #include "serveroptions.h"
 
 typedef struct {
-	int client_sockfd;
 	struct sockaddr_in address;
 	socklen_t addrlen;
+	SSL* ssl_object;
 } serverClient;
 
 typedef struct {
@@ -42,6 +42,7 @@ typedef struct {
 } clientTable;
 
 typedef struct {
+	serverOptions options;
 	int server_sockfd;
 	serverFeed rootfeed;
 	clientTable client_table;
@@ -51,9 +52,11 @@ typedef struct {
 
 	int port;
 	bool running;
+
+	bool debug_mode;
 } serverInstance;
 
-void clientTable_index(clientTable* table, serverClient* client);
+void clientTable_index(clientTable* table, serverClient* client, int client_sockfd);
 serverClient* clientTable_get(clientTable* table, int socketfd);
 
 int serverInstance_event_loop(serverOptions options);

@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdio.h>
 
 bool isnumber(char* string);
 
@@ -13,5 +16,8 @@ typedef struct {
 	// table[col][row]
 	char*** table;
 } CSValue;
+
+char* CSValue_get(CSValue* csv, uint32_t col, uint32_t row);
+CSValue CSValue_parse(char* csv_string);
 
 #endif
