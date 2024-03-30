@@ -5,14 +5,16 @@
 #define MAX_EVENTS 10
 #define MAX_RETRY 3
 
+#define MSG_MAX 1024
+
 serverClient* clientTable_get(clientTable* table, int socketfd) {
 	return table->clients[socketfd];
 }
 
 void clientTable_index(clientTable* table, serverClient* client, int client_sockfd) {
 	// TODO: Make this more efficient
-	if (table->max_client < client_sockfd) {
-		table->clients = realloc(table->clients, client_sockfd);
+	if (table->max_client <= client_sockfd) {
+		table->clients = realloc(table->clients, client_sockfd * sizeof(serverClient*));
 		table->max_client = client_sockfd;
 	}
 	table->clients[client_sockfd] = client;
@@ -156,14 +158,14 @@ int serverInstance_event_loop(serverOptions options) {
 			return EXIT_FAILURE;
 		}
 
-		for (int i = 0; i < MAX_EVENTS; i++) {
+		for (int i = 0; i < ready_fds; i++) {
 			int active_fd = events[i].data.fd;
 			// this means that a client is initiating a connection with the listening socket
 			if (active_fd == main_instance.server_sockfd) {
-				server_DEBUG(&main_instance, "Accepting new client.");
+				server_DEBUG(&main_instance, "Accepting new client...");
 
 				struct sockaddr_in client_address;
-				socklen_t client_address_size = 0;
+				socklen_t client_address_size = sizeof(client_address);
 				SSL* sslobj = NULL;
 				
 				int client_sockfd = serverInstance_accept_connection(
@@ -185,8 +187,17 @@ int serverInstance_event_loop(serverOptions options) {
 				clientTable_index(&main_instance.client_table, new_client, client_sockfd);
 			} else {
 				// recieve / send data
-				char buf[256];
-				int bytes = SSL_read(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, &buf, sizeof(buf));
+				char buf[MSG_MAX];
+				int bytes = SSL_read(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, &buf, MSG_MAX - 1);
+
+				if (bytes > 0) {
+
+				} else if (bytes == 0 ) {
+
+				} else {
+					server_DEBUG(&main_instance, "SSL_read() error");
+				}
+
 				buf[bytes] = '\0';
 				printf("%s\n", buf);
 			}
