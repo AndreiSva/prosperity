@@ -30,7 +30,7 @@ char* read_from_file(char* filename, long* length) {
 		exit(EXIT_FAILURE);
 	}
 
-	contents[size_bytes + 1] = '\0';
+	contents[size_bytes] = '\0';
 	fclose(file);
 	return contents;
 }

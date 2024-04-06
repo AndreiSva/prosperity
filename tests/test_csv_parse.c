@@ -13,6 +13,9 @@ int main() {
 	printf("%s\n", csv_source);
 	CSValue csv = CSValue_parse(csv_source);
 
-	assert(strcmp(CSValue_get(&csv, 0, 0), "name") == 1);
+	puts(CSValue_get(&csv, 1, 0));
+	puts(CSValue_get(&csv, 0, 1));
+	puts(CSValue_get(&csv, 0, 0));
+	assert(strcmp(CSValue_get(&csv, 0, 0), "name") == 0);
 }
 
