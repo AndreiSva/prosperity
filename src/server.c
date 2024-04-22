@@ -1,6 +1,7 @@
 #include "server.h"
 
 #include "logging.h"
+#include "wrapper.h"
 
 #define MAX_EVENTS 10
 #define MAX_RETRY 3
@@ -14,7 +15,7 @@ serverClient* clientTable_get(clientTable* table, int socketfd) {
 void clientTable_index(clientTable* table, serverClient* client, int client_sockfd) {
 	// TODO: Make this more efficient
 	if (table->max_client <= client_sockfd) {
-		table->clients = realloc(table->clients, client_sockfd * sizeof(serverClient*));
+		table->clients = xrealloc(table->clients, client_sockfd * sizeof(serverClient*));
 		table->max_client = client_sockfd;
 	}
 	table->clients[client_sockfd] = client;
@@ -177,7 +178,7 @@ int serverInstance_event_loop(serverOptions options) {
 				}
 
 				// now we can create a new client object and add it to the root feed
-				serverClient* new_client = malloc(sizeof(serverClient));
+				serverClient* new_client = xmalloc(sizeof(serverClient));
 				new_client->address = client_address;
 				new_client->addrlen = client_address_size;
 				new_client->ssl_object = sslobj;

@@ -17,7 +17,13 @@ typedef struct {
 	char*** table;
 } CSValue;
 
+// returns the value of a cell at <col> and <row>
 char* CSValue_get(CSValue* csv, uint32_t col, uint32_t row);
+
+// prints a CSValue object to <stream>
+void CSValue_put(FILE* stream, CSValue* csv);
+
+// parses a valid CSV string
 CSValue CSValue_parse(char* csv_string);
 
 #endif
