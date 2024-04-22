@@ -100,11 +100,14 @@ CSValue CSValue_parse(char* csv_string) {
 				}
 				break;
 			case '\"':
-				if (csv_string[current_pos - 1] == ',') {
+				;
+				char previous = csv_string[current_pos - 1];
+				char next = csv_string[current_pos + 1];
+				if (previous == ',' || previous == '\n') {
 					quoted = true;
 				}
 
-				if (csv_string[current_pos + 1] == ',') {
+				if (next == ',' || next == '\n') {
 					quoted = false;
 				}
 				break;
