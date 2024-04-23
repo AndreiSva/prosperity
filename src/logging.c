@@ -3,7 +3,7 @@
 #include "logging.h"
 #include "wrapper.h"
 
-const int MAX_TIME_STRING_SIZE = 64;
+#define MAX_TIME_STRING_SIZE 64
 
 char* server_get_logstr(int* log_string_length) {
 	time_t t = time(NULL);

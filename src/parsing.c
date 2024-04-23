@@ -142,6 +142,27 @@ CSValue CSValue_parse(char* csv_string) {
 	return csv;
 }
 
+size_t ustrlen(char* ustr) {
+	size_t count = 0;
+	int i = 0;
+	while (ustr[i] != '\0') {
+		if ((ustr[i] & 0xC0) != 0x80) {
+			count++;
+		}
+		i++;
+	}
+	return count;
+}
+
 void CSValue_put(FILE* stream, CSValue* csv) {
-	
+	for (int i = 0; i < csv->rows; i++) {
+		for (int j = 0; j < csv->cols; j++) {
+			fprintf(stream, "%s", CSValue_get(csv, j, i));
+
+			if (j != csv->cols - 1) {
+				fputc(',', stream);
+			}
+		}
+		fputc('\n', stream);
+	}
 }
