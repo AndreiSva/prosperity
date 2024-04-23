@@ -13,8 +13,13 @@
 
 #include "serveroptions.h"
 
+typedef union {
+	struct sockaddr_in ipv4addr;
+	struct sockaddr_in6 ipv6addr;
+} net_address;
+
 typedef struct {
-	struct sockaddr_in address;
+	net_address address;
 	socklen_t addrlen;
 	SSL* ssl_object;
 } serverClient;
