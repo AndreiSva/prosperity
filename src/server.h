@@ -62,7 +62,10 @@ typedef struct {
 } serverInstance;
 
 void clientTable_index(clientTable* table, serverClient* client, int client_sockfd);
-serverClient* clientTable_get(clientTable* table, int socketfd);
+serverClient* clientTable_get(clientTable* table, int client_sockfd);
+void clientTable_remove(clientTable* table, int client_sockfd);
+
+void serverClient_free(serverClient* client, int client_sockfd);
 
 int serverInstance_event_loop(serverOptions options);
 

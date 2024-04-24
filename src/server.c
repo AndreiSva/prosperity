@@ -9,8 +9,15 @@
 
 #define MSG_MAX 1024
 
-serverClient* clientTable_get(clientTable* table, int socketfd) {
-	return table->clients[socketfd];
+void serverClient_free(serverClient *client, int client_sockfd) {
+	close(client_sockfd);
+	SSL_shutdown(client->ssl_object);
+	SSL_free(client->ssl_object);
+	free(client);
+}
+
+serverClient* clientTable_get(clientTable* table, int client_sockfd) {
+	return table->clients[client_sockfd];
 }
 
 void clientTable_index(clientTable* table, serverClient* client, int client_sockfd) {
@@ -21,6 +28,20 @@ void clientTable_index(clientTable* table, serverClient* client, int client_sock
 		table->max_client = client_sockfd;
 	}
 	table->clients[client_sockfd] = client;
+}
+
+void clientTable_remove(clientTable* table, int client_sockfd) {
+	serverClient* removed_client = clientTable_get(table, client_sockfd);
+	serverClient_free(removed_client, client_sockfd);
+	table->clients[client_sockfd] = NULL;
+	if (client_sockfd == table->max_client) {
+		for (int i = client_sockfd; i >= 0; i--) {
+			if (table->clients[i] != NULL) {
+				table->max_client = i;
+				break;
+			}
+		}
+	}
 }
 
 static serverInstance serverInstance_init(serverOptions options) {
@@ -55,16 +76,18 @@ static serverInstance serverInstance_init(serverOptions options) {
 static void serverInstance_cleanup(serverInstance* server_instance) {
 	// free the clients and close the client sockets
 	for (int i = 0; i < server_instance->client_table.max_client; i++) {
-		if (server_instance->client_table.clients[i] != NULL) {
-			close(i);
-			SSL_shutdown(server_instance->client_table.clients[i]->ssl_object);
-			SSL_free(server_instance->client_table.clients[i]->ssl_object);
-			free(server_instance->client_table.clients[i]);
+		// free the remaining clients
+		serverClient* current_client = server_instance->client_table.clients[i];
+		if (current_client != NULL) {
+			// remember the index of the client in the table is it's sockfd
+			serverClient_free(current_client, i);
 		}
 	}
 
 	SSL_CTX_free(server_instance->sslctx);
 	close(server_instance->epollfd);
+	close(server_instance->server_sockfd);
+	free(server_instance->client_table.clients);
 }
 
 static SSL_CTX* serverInstance_initSSL(serverInstance* server_instance, char* cert_path, char* key_path) {
@@ -193,6 +216,11 @@ int serverInstance_event_loop(serverOptions options) {
 	while (main_instance.running) {
 		int ready_fds = epoll_wait(main_instance.epollfd, events, MAX_EVENTS, -1);	
 		if (ready_fds == -1) {
+			// Unix has some interesting behavior with signals and epoll_wait
+			if (errno == EINTR) {
+				continue;
+			}
+
 			perror("epoll_wait failed");
 			return EXIT_FAILURE;
 		}
@@ -217,10 +245,9 @@ int serverInstance_event_loop(serverOptions options) {
 
 				// now we can create a new client object and add it to the root feed
 				serverClient* new_client = xmalloc(sizeof(serverClient));
+				new_client->ssl_object = sslobj;
 				new_client->address = client_address;
 				new_client->addrlen = client_address_size;
-				new_client->ssl_object = sslobj;
-				// new_client->feed = init_feed 
 
 				// add the client to the server's client table
 				clientTable_index(&main_instance.client_table, new_client, client_sockfd);
@@ -230,31 +257,18 @@ int serverInstance_event_loop(serverOptions options) {
 				size_t bytes = 0;
 				int read_result = SSL_read_ex(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, &buf, MSG_MAX - 1, &bytes);
 
-				if (read_result == false) {
-					int ssl_error = SSL_get_error(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, read_result);
-					if (ssl_error == SSL_ERROR_WANT_READ || ssl_error == SSL_ERROR_WANT_WRITE) {
-						// we can't read right now, so we'll just wait
-						continue;
-					
-					} else {
-						// there was an error
-						server_DEBUG(&main_instance, "SSL_read() error");
-					}
-				}
-
 				if (bytes > 0) {
 					// TODO: handle the message
 					server_DEBUG(&main_instance, "Received data from client");
+					buf[bytes] = '\0';
+					printf("%s\n", buf);
 				} else if (bytes == 0 ) {
-					// TODO: handle the client disconnecting
 					server_DEBUG(&main_instance, "Client Disconnected");
+					clientTable_remove(&main_instance.client_table, active_fd);
 				} else {
 					// if the return value is -1, there was an error
 					server_DEBUG(&main_instance, "SSL_read() error");
 				}
-
-				buf[bytes] = '\0';
-				printf("%s\n", buf);
 			}
 		}
 	}
