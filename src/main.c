@@ -15,7 +15,7 @@
 #endif
 
 static void print_usage(char* progname) {
-	fprintf(stderr, "Usage: %s --key <KeyFile.pem> --cert <CertFile.pem> [--port n]\n", progname);
+	fprintf(stderr, "Usage: %s --key <KeyFile.pem> --cert <CertFile.pem> [--port n] [--help] [--version] [--debug] [--use-ipv4]\n", progname);
 }
 
 int main(int argc, char** argv) {

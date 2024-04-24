@@ -26,4 +26,7 @@ void CSValue_put(FILE* stream, CSValue* csv);
 // parses a valid CSV string
 CSValue CSValue_parse(char* csv_string);
 
+// returns the length of a utf-8 encoded string
+size_t ustrlen(char* ustr);
+
 #endif

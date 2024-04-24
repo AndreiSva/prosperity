@@ -2,6 +2,7 @@
 
 #include "logging.h"
 #include "wrapper.h"
+#include "parsing.h"
 
 #define MAX_EVENTS 10
 #define MAX_RETRY 3
@@ -79,23 +80,26 @@ static void serverInstance_setup(serverInstance* server_instance, serverOptions 
 	net_address address;
 
 	if (options.ipv4) {
-		address.ipv6addr = (struct sockaddr_in6) {
-			.sin6_addr = in6addr_any,
-			.sin6_port = htons(server_instance->port),
-			.sin6_family = AF_INET6,
-		};
-	} else {
 		address.ipv4addr = (struct sockaddr_in) {
 			.sin_addr = {INADDR_ANY},
 			.sin_port = htons(server_instance->port),
 			.sin_family = AF_INET,
 		};
+	} else {
+		address.ipv6addr = (struct sockaddr_in6) {
+			.sin6_addr = in6addr_any,
+			.sin6_port = htons(server_instance->port),
+			.sin6_family = AF_INET6,
+		};
 	}
 
 	int bind_result;
+	server_DEBUG(server_instance, "Binding to port...");
 	if (options.ipv4) {
+		server_DEBUG(server_instance, "Using IPv4");
 		bind_result = bind(server_instance->server_sockfd, (struct sockaddr*) &address.ipv4addr, sizeof(address.ipv4addr));
 	} else {
+		server_DEBUG(server_instance, "Using IPv6");
 		bind_result = bind(server_instance->server_sockfd, (struct sockaddr*) &address.ipv6addr, sizeof(address.ipv6addr));
 	}
 
@@ -136,7 +140,7 @@ static int serverInstance_accept_connection(
 			serverInstance* server_instance, 
 			net_address* client_address, 
 			socklen_t* addrlen,
-			SSL* ssl_object
+			SSL** ssl_object
 		) {
 
 	struct sockaddr* client_addr = (struct sockaddr*) &client_address->ipv6addr;
@@ -170,9 +174,9 @@ static int serverInstance_accept_connection(
 
 	// perform TLS handshake
 	// TODO: remember to put this in the client struct for future communication
-	ssl_object = SSL_new(server_instance->sslctx);
-	SSL_set_fd(ssl_object, client_sockfd);
-	if (SSL_accept(ssl_object) == -1) {
+	*ssl_object = SSL_new(server_instance->sslctx);
+	SSL_set_fd(*ssl_object, client_sockfd);
+	if (SSL_accept(*ssl_object) == -1) {
 		perror("TLS handshake failed");
 		return -1;
 	}
@@ -180,6 +184,7 @@ static int serverInstance_accept_connection(
 	return client_sockfd;
 }
 
+// TODO: We probably want to have this take a serverInstance instead of serverOptions
 int serverInstance_event_loop(serverOptions options) {
 	serverInstance main_instance = serverInstance_init(options);
 	serverInstance_setup(&main_instance, options);
@@ -203,7 +208,7 @@ int serverInstance_event_loop(serverOptions options) {
 				SSL* sslobj = NULL;
 				
 				int client_sockfd = serverInstance_accept_connection(
-					&main_instance, &client_address, &client_address_size, sslobj
+					&main_instance, &client_address, &client_address_size, &sslobj
 				);
 
 				if (client_sockfd == -1) {
@@ -222,12 +227,27 @@ int serverInstance_event_loop(serverOptions options) {
 			} else {
 				// recieve / send data
 				char buf[MSG_MAX];
-				int bytes = SSL_read(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, &buf, MSG_MAX - 1);
+				size_t bytes = 0;
+				int read_result = SSL_read_ex(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, &buf, MSG_MAX - 1, &bytes);
+
+				if (read_result == false) {
+					int ssl_error = SSL_get_error(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, read_result);
+					if (ssl_error == SSL_ERROR_WANT_READ || ssl_error == SSL_ERROR_WANT_WRITE) {
+						// we can't read right now, so we'll just wait
+						continue;
+					
+					} else {
+						// there was an error
+						server_DEBUG(&main_instance, "SSL_read() error");
+					}
+				}
 
 				if (bytes > 0) {
 					// TODO: handle the message
+					server_DEBUG(&main_instance, "Received data from client");
 				} else if (bytes == 0 ) {
 					// TODO: handle the client disconnecting
+					server_DEBUG(&main_instance, "Client Disconnected");
 				} else {
 					// if the return value is -1, there was an error
 					server_DEBUG(&main_instance, "SSL_read() error");
