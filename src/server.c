@@ -257,17 +257,29 @@ int serverInstance_event_loop(serverOptions options) {
 				size_t bytes = 0;
 				int read_result = SSL_read_ex(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, &buf, MSG_MAX - 1, &bytes);
 
+				if (!read_result) {
+					server_DEBUG(&main_instance, "SSL_read_ex failed");
+					SSL* active_ssl = clientTable_get(&main_instance.client_table, active_fd)->ssl_object;
+					int error = SSL_get_error(active_ssl, read_result);
+
+					// these are retryable errors
+					if (error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
+						continue;
+					}
+				}
+
 				if (bytes > 0) {
 					// TODO: handle the message
 					server_DEBUG(&main_instance, "Received data from client");
 					buf[bytes] = '\0';
-					printf("%s\n", buf);
+
+					CSValue client_data = CSValue_parse(buf);
+					CSValue_put(stdout, &client_data);
+
+					CSValue_free(&client_data);
 				} else if (bytes == 0 ) {
 					server_DEBUG(&main_instance, "Client Disconnected");
 					clientTable_remove(&main_instance.client_table, active_fd);
-				} else {
-					// if the return value is -1, there was an error
-					server_DEBUG(&main_instance, "SSL_read() error");
 				}
 			}
 		}

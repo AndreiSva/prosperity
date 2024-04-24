@@ -66,6 +66,15 @@ static void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t r
 	csv->table[col][row] = cell_string;
 }
 
+static void cell_addchar(char** cell, size_t* cell_length, size_t* cell_size, char c) {
+	if (*cell_length >= *cell_size) {
+		*cell_size += CSV_CELL_SIZE;
+		*cell = xrealloc(*cell, *cell_size);
+	}
+	(*cell)[*cell_length] = c;
+	(*cell_length)++;
+}
+
 CSValue CSValue_parse(char* csv_string) {
 	CSValue csv = {
 		.cols = 1,
@@ -79,7 +88,7 @@ CSValue CSValue_parse(char* csv_string) {
 	int current_row = 0;
 	int current_pos = 0;
 
-	uint32_t cell_string_length = 0;
+	size_t cell_string_length = 0;
 	size_t cell_string_size = CSV_CELL_SIZE;
 	char* cell = xmalloc(cell_string_size);
 
@@ -97,12 +106,21 @@ CSValue CSValue_parse(char* csv_string) {
 					cell_string_length = 0;
 					free(cell); // CSValue_edit_cell doesn't free our cell for us
 					cell = xmalloc(cell_string_size);
+				} else {
+					cell_addchar(&cell, &cell_string_length, &cell_string_size, csv_string[current_pos]);
 				}
 				break;
 			case '\"':
 				;
-				char previous = csv_string[current_pos - 1];
+				char previous;
+				if (current_pos == 0) {
+					previous = '\n';
+				} else {
+		 			previous = csv_string[current_pos - 1];
+				}
+
 				char next = csv_string[current_pos + 1];
+
 				if (previous == ',' || previous == '\n') {
 					quoted = true;
 				}
@@ -110,6 +128,11 @@ CSValue CSValue_parse(char* csv_string) {
 				if (next == ',' || next == '\n') {
 					quoted = false;
 				}
+
+				if (previous != ',' && previous != '\n' && next != ',' && next != '\n') {
+					cell_addchar(&cell, &cell_string_length, &cell_string_size, csv_string[current_pos]);
+				}
+
 				break;
 			case '\n':
 				// if we're at the end of the line, add the cell to the table
@@ -128,12 +151,7 @@ CSValue CSValue_parse(char* csv_string) {
 				break;
 			default:
 				// add the current letter to our cell and expand the cell if necessary
-				if (cell_string_length >= cell_string_size) {
-					cell_string_size += CSV_CELL_SIZE;
-					cell = xrealloc(cell, cell_string_size);
-				}
-				cell[cell_string_length] = csv_string[current_pos];
-				cell_string_length++;
+				cell_addchar(&cell, &cell_string_length, &cell_string_size, csv_string[current_pos]);
 		}
 		
 		current_pos++;
@@ -157,7 +175,20 @@ size_t ustrlen(char* ustr) {
 void CSValue_put(FILE* stream, CSValue* csv) {
 	for (int i = 0; i < csv->rows; i++) {
 		for (int j = 0; j < csv->cols; j++) {
-			fprintf(stream, "%s", CSValue_get(csv, j, i));
+			char* cell = CSValue_get(csv, j, i);
+
+			// if our cell contains a comma it means we should quote it
+			bool quoted = strchr(cell, ',') != NULL;
+			
+			if (quoted) {
+				fputc('\"', stream);
+			}
+
+			fprintf(stream, "%s", cell);
+
+			if (quoted) {
+				fputc('\"', stream);
+			}
 
 			if (j != csv->cols - 1) {
 				fputc(',', stream);
@@ -165,4 +196,14 @@ void CSValue_put(FILE* stream, CSValue* csv) {
 		}
 		fputc('\n', stream);
 	}
+}
+
+void CSValue_free(CSValue* csv) {
+	for (int i = 0; i < csv->cols; i++) {
+		for (int j = 0; j < csv->rows; j++) {
+			free(csv->table[i][j]);
+		}
+		free(csv->table[i]);
+	}
+	free(csv->table);
 }
