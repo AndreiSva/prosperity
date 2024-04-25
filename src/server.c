@@ -60,12 +60,8 @@ static serverInstance serverInstance_init(serverOptions options) {
 			.max_client = 0,
 		},
 		.rootfeed = {
-			.clients = NULL,
-			.num_clients = 0,
-
+			.client = NULL,
 			.subfeeds = NULL,
-			.num_subfeeds = 0,
-
 			.parent_feed = NULL,
 		},
 		.debug_mode = options.debug_mode
@@ -94,8 +90,25 @@ static SSL_CTX* serverInstance_initSSL(serverInstance* server_instance, char* ce
 	server_DEBUG(server_instance, "Initializing SSL/TLS");
 	SSL_library_init();
 	SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
-	SSL_CTX_use_certificate_file(ctx, cert_path, SSL_FILETYPE_PEM);
-	SSL_CTX_use_PrivateKey_file(ctx, key_path, SSL_FILETYPE_PEM);
+
+	int cert_result = SSL_CTX_use_certificate_file(ctx, cert_path, SSL_FILETYPE_PEM);
+	if (cert_result != 1) {
+		fprintf(stderr, "Failed to load certificate file: %s\n", cert_path);
+		exit(EXIT_FAILURE);
+	}
+
+	int key_result = SSL_CTX_use_PrivateKey_file(ctx, key_path, SSL_FILETYPE_PEM);
+	if (key_result != 1) {
+		fprintf(stderr, "Failed to load key file: %s\n", key_path);
+		exit(EXIT_FAILURE);
+	}
+
+	int key_check = SSL_CTX_check_private_key(ctx);
+	if (key_check != 1) {
+		fprintf(stderr, "Key and certificate do not match\n");
+		exit(EXIT_FAILURE);
+	}
+
 	return ctx;
 }
 
