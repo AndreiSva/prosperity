@@ -1,3 +1,5 @@
+#include <signal.h>
+
 #include "server.h"
 
 #include "logging.h"
@@ -70,6 +72,7 @@ static serverInstance serverInstance_init(serverOptions options) {
 }
 
 static void serverInstance_cleanup(serverInstance* server_instance) {
+	server_LOG("Shutting Down Server...");
 	// free the clients and close the client sockets
 	for (int i = 0; i < server_instance->client_table.max_client; i++) {
 		// free the remaining clients
@@ -220,12 +223,26 @@ static int serverInstance_accept_connection(
 	return client_sockfd;
 }
 
+static bool* is_running = NULL;
+static void handle_sigint(int sig) {
+	*is_running = false;
+}
+
 // TODO: We probably want to have this take a serverInstance instead of serverOptions
 int serverInstance_event_loop(serverOptions options) {
 	serverInstance main_instance = serverInstance_init(options);
 	serverInstance_setup(&main_instance, options);
 
 	struct epoll_event events[MAX_EVENTS];
+	is_running = &main_instance.running;
+
+	// handle ctrl-c
+	struct sigaction sigint_action = {
+		.sa_handler = handle_sigint,
+		.sa_flags = 0,
+	};
+	sigaction(SIGINT, &sigint_action, NULL);
+
 	while (main_instance.running) {
 		int ready_fds = epoll_wait(main_instance.epollfd, events, MAX_EVENTS, -1);	
 		if (ready_fds == -1) {
