@@ -24,21 +24,24 @@ typedef struct {
 	SSL* ssl_object;
 } serverClient;
 
-typedef struct {
-	char symbol;
+typedef struct serverFlag {
+	char* flag_name;
+	char* flag_value;
+	
+	struct serverFlag* subflags;
+	struct serverFlag* pnext_flag;
+
 	bool inherit;
 } serverFlag;
 
 typedef struct serverFeed {
-	serverClient* clients;
-	uint64_t num_clients;
-
+	serverClient* client;
 	serverFlag* flags;
-	uint32_t num_flags;
 	
 	struct serverFeed* parent_feed;
+
+	struct serverFeed* pnext_serverfeed;
 	struct serverFeed* subfeeds;
-	uint64_t num_subfeeds;
 } serverFeed;
 
 typedef struct {
@@ -68,5 +71,14 @@ void clientTable_remove(clientTable* table, int client_sockfd);
 void serverClient_free(serverClient* client, int client_sockfd);
 
 int serverInstance_event_loop(serverOptions options);
+
+serverFlag* serverFlag_new(char* flag_name, char* flag_value);
+void serverFlag_add_subflag(serverFlag* parent_flag, serverFlag* subflag);
+void serverFlag_free(serverFlag* flag);
+
+serverFeed serverFeed_new(serverFeed* parent_feed, serverFlag* flags);
+void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed);
+void serverFeed_delete_subfeed(serverFeed* parent_feed, uint64_t child_index);
+void serverFeed_free(serverFeed* feed);
 
 #endif
