@@ -54,10 +54,26 @@ serverFeed serverFeed_new(serverFeed* parent_feed, serverFlag* flags) {
 	return new_feed;
 }
 
-void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed) {
+void serverFeed_free(serverFeed* feed) {
+	serverFlag* head = feed->flags;
+	while (head != NULL) {
+		head = head->subflags;
+		serverFlag_free(head);
+	}
 
+	serverFeed* head_feed = feed->subfeeds;
+	while (head_feed != NULL) {
+		head_feed = head_feed->subfeeds;
+		serverFeed_free(head_feed);
+	}
+
+	free(feed);
 }
 
-void serverFeed_delete_subfeed(serverFeed* parent_feed, uint64_t child_index) {
-
+void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed) {
+	serverFeed* head = parent_feed->subfeeds;
+	while (head != NULL) {
+		head = head->subfeeds;
+	}
+	head->subfeeds = child_feed;
 }

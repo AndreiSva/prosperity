@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <openssl/err.h>
 
 #include "server.h"
 
@@ -47,13 +48,8 @@ void clientTable_remove(clientTable* table, int client_sockfd) {
 }
 
 static serverInstance serverInstance_init(serverOptions options) {
-	int socket_type = AF_INET6;
-	if (options.ipv4) {
-		socket_type = AF_INET;
-	}
-
 	serverInstance result = {
-		.server_sockfd = socket(socket_type, SOCK_STREAM | SOCK_NONBLOCK, 0),
+		.server_sockfd = socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK, 0),
 		.port = options.port,
 		.running = true,
 		.sslctx = NULL,
@@ -68,6 +64,14 @@ static serverInstance serverInstance_init(serverOptions options) {
 		},
 		.debug_mode = options.debug_mode
 	};
+
+	int use_ipv4 = !options.ipv6_only;
+	int sockopt_result = setsockopt(result.server_sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &use_ipv4, sizeof(use_ipv4));
+
+	if (sockopt_result == -1) {
+		perror("setsockopt failed");
+		exit(EXIT_FAILURE);
+	}
 	return result;
 }
 
@@ -116,31 +120,15 @@ static SSL_CTX* serverInstance_initSSL(serverInstance* server_instance, char* ce
 }
 
 static void serverInstance_setup(serverInstance* server_instance, serverOptions options) {
-	net_address address;
-
-	if (options.ipv4) {
-		address.ipv4addr = (struct sockaddr_in) {
-			.sin_addr = {INADDR_ANY},
-			.sin_port = htons(server_instance->port),
-			.sin_family = AF_INET,
-		};
-	} else {
-		address.ipv6addr = (struct sockaddr_in6) {
-			.sin6_addr = in6addr_any,
-			.sin6_port = htons(server_instance->port),
-			.sin6_family = AF_INET6,
-		};
-	}
+	net_address address = (struct sockaddr_in6) {
+		.sin6_addr = in6addr_any,
+		.sin6_port = htons(server_instance->port),
+		.sin6_family = AF_INET6,
+	};
 
 	int bind_result;
 	server_DEBUG(server_instance, "Binding to port...");
-	if (options.ipv4) {
-		server_DEBUG(server_instance, "Using IPv4");
-		bind_result = bind(server_instance->server_sockfd, (struct sockaddr*) &address.ipv4addr, sizeof(address.ipv4addr));
-	} else {
-		server_DEBUG(server_instance, "Using IPv6");
-		bind_result = bind(server_instance->server_sockfd, (struct sockaddr*) &address.ipv6addr, sizeof(address.ipv6addr));
-	}
+	bind_result = bind(server_instance->server_sockfd, (struct sockaddr*) &address, sizeof(address));
 
 	if (bind_result == -1) {
 		perror("server bind failed");
@@ -182,15 +170,10 @@ static int serverInstance_accept_connection(
 			SSL** ssl_object
 		) {
 
-	struct sockaddr* client_addr = (struct sockaddr*) &client_address->ipv6addr;
-	*addrlen = sizeof(client_address->ipv6addr);
-	if (server_instance->options.ipv4) {
-		client_addr = (struct sockaddr*) &client_address->ipv4addr;
-		*addrlen = sizeof(client_address->ipv4addr);
-	}
-	
+	*addrlen = sizeof(*client_address);
+
 	// accept the connection
-	int client_sockfd = accept(server_instance->server_sockfd, client_addr, addrlen);
+	int client_sockfd = accept(server_instance->server_sockfd, (struct sockaddr*) client_address, addrlen);
 
 	// if the connection stack is empty, break
 	if (client_sockfd == -1) {
@@ -288,13 +271,18 @@ int serverInstance_event_loop(serverOptions options) {
 				int read_result = SSL_read_ex(clientTable_get(&main_instance.client_table, active_fd)->ssl_object, &buf, MSG_MAX - 1, &bytes);
 
 				if (!read_result) {
-					server_DEBUG(&main_instance, "SSL_read_ex failed");
 					SSL* active_ssl = clientTable_get(&main_instance.client_table, active_fd)->ssl_object;
 					int error = SSL_get_error(active_ssl, read_result);
 
 					// these are retryable errors
 					if (error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
 						continue;
+					}
+					
+					if (main_instance.debug_mode) {
+						char error_string[256];
+						ERR_error_string_n(ERR_get_error(), error_string, 256);
+						server_DEBUG(&main_instance, error_string);
 					}
 				}
 

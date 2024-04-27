@@ -13,10 +13,7 @@
 
 #include "serveroptions.h"
 
-typedef union {
-	struct sockaddr_in ipv4addr;
-	struct sockaddr_in6 ipv6addr;
-} net_address;
+typedef struct sockaddr_in6 net_address;
 
 typedef struct {
 	net_address address;

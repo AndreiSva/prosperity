@@ -7,7 +7,7 @@ typedef struct {
 	int port;
 	char* config_path;
 	bool debug_mode;
-	bool ipv4;
+	bool ipv6_only;
 
 	char* cert_path;
 	char* key_path;

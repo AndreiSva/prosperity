@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 		.port = DEFAULT_PORT,
 		.config_path = NULL,
 		.debug_mode = false,
-		.ipv4 = false,
+		.ipv6_only = false,
 
 		.cert_path = NULL,
 		.key_path = NULL,
@@ -33,14 +33,14 @@ int main(int argc, char** argv) {
 	while (true) {
 		int option_index = 0;
 		static struct option cli_options[] = {
-			{"port"    , required_argument, 0, 0},
-			{"cert"    , required_argument, 0, 0},
-			{"key"     , required_argument, 0, 0},
-			{"help"    , no_argument      , 0, 0},
-			{"version" , no_argument      , 0, 0},
-			{"debug"   , no_argument      , 0, 0},
-			{"use-ipv4", no_argument      , 0, 0},
-			{0         , 0                , 0, 0}
+			{"port"     , required_argument, 0, 0},
+			{"cert"     , required_argument, 0, 0},
+			{"key"      , required_argument, 0, 0},
+			{"help"     , no_argument      , 0, 0},
+			{"version"  , no_argument      , 0, 0},
+			{"debug"    , no_argument      , 0, 0},
+			{"ipv6-only", no_argument      , 0, 0},
+			{0          , 0                , 0, 0}
 		};
 
 		int option = getopt_long(argc, argv, "", cli_options, &option_index);
@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 				} else if (strcmp(current_option.name, "debug") == 0) {
 					server_options.debug_mode = true;
 				} else if (strcmp(current_option.name, "use-ipv4") == 0) {
-					server_options.ipv4 = true;
+					server_options.ipv6_only = true;
 				}
 		}
 	}
