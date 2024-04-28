@@ -13,9 +13,11 @@
 #define MSG_MAX 1024
 
 void serverClient_free(serverClient *client, int client_sockfd) {
-	close(client_sockfd);
 	SSL_shutdown(client->ssl_object);
 	SSL_free(client->ssl_object);
+	
+	close(client_sockfd);
+
 	free(client);
 }
 
@@ -276,6 +278,12 @@ int serverInstance_event_loop(serverOptions options) {
 
 					// these are retryable errors
 					if (error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
+						continue;
+					}
+
+					// unrecoverable errors :(
+					if (error == SSL_ERROR_SSL || error == SSL_ERROR_SYSCALL) {
+						clientTable_remove(&main_instance.client_table, active_fd);
 						continue;
 					}
 					
