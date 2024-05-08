@@ -30,6 +30,10 @@ void clientTable_index(clientTable* table, serverClient* client, int client_sock
 	if (table->max_client <= client_sockfd) {
 		size_t new_size = (client_sockfd + 1) * sizeof(serverClient*);
 		table->clients = xrealloc(table->clients, new_size);
+		
+		// initialize the new clients to NULL
+		memset(table->clients + table->max_client, 0, new_size - table->max_client);
+		
 		table->max_client = client_sockfd;
 	}
 	table->clients[client_sockfd] = client;
@@ -283,6 +287,7 @@ int serverInstance_event_loop(serverOptions options) {
 
 					// unrecoverable errors :(
 					if (error == SSL_ERROR_SSL || error == SSL_ERROR_SYSCALL) {
+						server_DEBUG(&main_instance, "Client Disconnected");
 						clientTable_remove(&main_instance.client_table, active_fd);
 						continue;
 					}
