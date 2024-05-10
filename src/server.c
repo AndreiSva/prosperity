@@ -27,12 +27,14 @@ serverClient* clientTable_get(clientTable* table, int client_sockfd) {
 
 void clientTable_index(clientTable* table, serverClient* client, int client_sockfd) {
 	// TODO: Make this more efficient
+	// This version isn't particularly efficient because it has to reallocate the entire array
+	// every time a new client is added. Should probably allocate in chunks of 10 or something
 	if (table->max_client <= client_sockfd) {
 		size_t new_size = (client_sockfd + 1) * sizeof(serverClient*);
 		table->clients = xrealloc(table->clients, new_size);
 		
 		// initialize the new clients to NULL
-		memset(table->clients + table->max_client, 0, new_size - table->max_client);
+		memset(&table->clients[table->max_client + 1], 0, (client_sockfd - table->max_client) * sizeof(serverClient*));
 		
 		table->max_client = client_sockfd;
 	}
@@ -41,6 +43,9 @@ void clientTable_index(clientTable* table, serverClient* client, int client_sock
 
 void clientTable_remove(clientTable* table, int client_sockfd) {
 	serverClient* removed_client = clientTable_get(table, client_sockfd);
+	if (removed_client == NULL) {
+		return;
+	}
 	serverClient_free(removed_client, client_sockfd);
 	table->clients[client_sockfd] = NULL;
 	if (client_sockfd == table->max_client) {
@@ -84,13 +89,9 @@ static serverInstance serverInstance_init(serverOptions options) {
 static void serverInstance_cleanup(serverInstance* server_instance) {
 	server_LOG("Shutting Down Server...");
 	// free the clients and close the client sockets
-	for (int i = 0; i < server_instance->client_table.max_client; i++) {
+	for (int i = 0; i <= server_instance->client_table.max_client; i++) {
 		// free the remaining clients
-		serverClient* current_client = server_instance->client_table.clients[i];
-		if (current_client != NULL) {
-			// remember the index of the client in the table is it's sockfd
-			serverClient_free(current_client, i);
-		}
+		clientTable_remove(&server_instance->client_table, i);
 	}
 
 	SSL_CTX_free(server_instance->sslctx);

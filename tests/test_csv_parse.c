@@ -13,6 +13,7 @@ int main() {
 	printf("%s\n", csv_source);
 	CSValue csv = CSValue_parse(csv_source);
 	free(csv_source);
+	CSValue_free(&csv);
 
 	assert(strcmp(CSValue_get(&csv, 0, 0), "name") == 0);
 	assert(strcmp(CSValue_get(&csv, 1, 0), "species") == 0);

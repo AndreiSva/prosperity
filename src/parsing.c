@@ -29,7 +29,6 @@ char* CSValue_get(CSValue* csv, uint32_t col, uint32_t row) {
 }
 
 // TODO: add more error checking here
-// CSValue is supposed to be immutable once parsed, so this can be static
 static void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t row) {
 	// if we want to add a cell outside of what we've allocated already, allocate the new memory
 
@@ -156,7 +155,8 @@ CSValue CSValue_parse(char* csv_string) {
 		
 		current_pos++;
 	}
-
+	
+	free(cell);
 	return csv;
 }
 

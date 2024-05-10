@@ -22,4 +22,5 @@ int main() {
 
 	assert(strcmp(CSValue_get(&csv, 0, 2), "❤️") == 0);
 	assert(strcmp(CSValue_get(&csv, 1, 2), "love is in the air") == 0);
+	CSValue_free(&csv);
 }
