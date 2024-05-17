@@ -1,0 +1,24 @@
+<pre class="metadata">
+Title: STaMPv1
+Status: LS-COMMIT
+Shortname: stamp-spec
+Level: none
+Editor: Andrei Sova
+Abstract: This document specifies the Simple Table-based Messaging Protocol (STaMP) protocol, version 1. STamP is secure and simple text-based instant messaging communication protocol.
+</pre>
+
+<pre boilerplate="copyright">
+Copyright &copy; [YEAR] Andrei Sova
+</pre>
+
+Note: This document can always be improved upon. I am by no means an expert at writing specifications, so please contribue on Github!
+
+# Introduction # {#introduction}
+
+STaMP is an application-layer protocol for instant messaging (IM) communication. The protocol uses a syntax generally built-uppon the CSV specification outlined in [[!RFC4180]]. Furthermore, STaMP has an additional syntax used for retrieving and setting flags, as described in [[#flags]].
+
+Unlike [[RFC1459]], this specification implements several mandatory authorization and user management features. STaMP's use of CSV additionally significantly simplifies the development of client software, as it introduces a unified syntax for interacting with the server. This is further simplified by STaMP's orthogonal design, which requires clients and servers to implement only a few interconnected components to achieve functioning software.
+
+Instant messaging has evolved drastically over the past several decades, growing from being strictly a means of text message transmission to a broader aspect of human life. Therefore, STaMP is built from the ground up as an extensible protocol, to facilitate the always-changing needs of internet communication.
+
+## Flags ## {#flags}
