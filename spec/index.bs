@@ -4,21 +4,135 @@ Status: LS-COMMIT
 Shortname: stamp-spec
 Level: none
 Editor: Andrei Sova
-Abstract: This document specifies the Simple Table-based Messaging Protocol (STaMP) protocol, version 1. STamP is secure and simple text-based instant messaging communication protocol.
+Abstract: This document specifies the Simple Table-based Messaging Protocol (STaMP) protocol, version 1. STaMP is secure and simple text-based communication protocol.
+Markup Shorthands: markdown yes
+Warning: Not Ready
 </pre>
 
 <pre boilerplate="copyright">
 Copyright &copy; [YEAR] Andrei Sova
 </pre>
 
-Note: This document can always be improved upon. I am by no means an expert at writing specifications, so please contribue on Github!
+Note: This document can always be improved upon. I am by no means an expert at writing specifications, and have mostly been writing this for fun. So please, contribute on Github!
 
 # Introduction # {#introduction}
 
-STaMP is an application-layer protocol for instant messaging (IM) communication. The protocol uses a syntax generally built-uppon the CSV specification outlined in [[!RFC4180]]. Furthermore, STaMP has an additional syntax used for retrieving and setting flags, as described in [[#flags]].
+STaMP is an application-layer communication protocol. The protocol uses a syntax generally built upon the CSV specification outlined in [[!RFC4180]]. Furthermore, STaMP has an additional subsyntax used for retrieving and setting flags, as described in [[#flag-dot-notation]].
 
 Unlike [[RFC1459]], this specification implements several mandatory authorization and user management features. STaMP's use of CSV additionally significantly simplifies the development of client software, as it introduces a unified syntax for interacting with the server. This is further simplified by STaMP's orthogonal design, which requires clients and servers to implement only a few interconnected components to achieve functioning software.
 
-Instant messaging has evolved drastically over the past several decades, growing from being strictly a means of text message transmission to a broader aspect of human life. Therefore, STaMP is built from the ground up as an extensible protocol, to facilitate the always-changing needs of internet communication.
+Additionally, though not an email replacement, STaMP can be used as a simpler alternative to [[RFC5321]] and [[RFC9051]], thanks to the ability to store and send persistant messages in a federated manner.
+
+Messaging has evolved drastically over the past several decades, growing from being strictly a means of text message transmission to a broader aspect of human life. Therefore, STaMP is built from the ground up as an extensible protocol, to facilitate the always-changing needs of internet communication.
+
+## Terminology ## {#terminology}
+
+The following terminology is to be used in this document or when referencing STaMP.
+<pre class=simpledef>
+Server: Any STaMP compliant program that listens for connections on the standard STaMP port (see [[#standard-ports]]) and accepts client connections to a root feed.
+Client: Any STaMP compliant program that connects to a STaMP compliant server.
+User: A person who connects to a STaMP server using a client for the intent of communication.
+Chatroom: A shared communication channel containing multiple users.
+</pre>
+
+Unless otherwise specified, the value of flags as described in [[#root-feed]] must be assumed to be 0.
+
+# High-Level Specification Overview # {#Spec-Overview}
+
+There are only two distinct object types present in the STaMP protocol, namely **feeds** and **flags**. Together, feeds and flags act as a unified interface used to describe all other roles and objects in the protocol, which are often represented by vastly different concepts in other specifications. 
+
+## Feeds ## {#feeds}
+
+Feeds are a hierarchical object structure used to model communication and relational structures across the specification. They are used to model chat users, chatrooms, and the server itself.
+
+One of the most important properties of feeds is their ability to contain an arbitrary number of subfeeds, also called children feeds. A feed can additionally have any number of flags, as discussed in [[#flags]].
+
+Every feed must have a name flag, which used for addressing purposes as described in [[#stamp-feed-address]].
+
+In its initial state, a STaMP server begins with a single feed, called the **root feed**, as described in [[#root-feed]].
 
 ## Flags ## {#flags}
+
+STaMP's permission model is entirely based around the hierarchical nature of feeds. Specifically, parent feeds always have direct permission privilege over their child feeds.
+
+# Protocol Syntax # {#spec-syntax}
+
+## Flag Dot Notation ## {#flag-dot-notation}
+
+Dot notation can be used to retrieve or set flag values of any specified feed. The simple syntax can be expressed in the following railroad notation:
+
+<pre class="railroad">
+T: <BASEFLAG>
+ZeroOrMore:
+    T: .
+    T: <SUBFLAG>
+</pre>
+
+## STaMP Feed Address Syntax ## {#stamp-feed-address}
+
+# STaMP Methods
+
+# Server Requirements and Behavior # {#server-requirements}
+
+## Text Encoding ## {#string-encoding}
+
+All strings and text communicated through the STaMP protocol, as well as all CSV tables and flags read and written must be in a valid utf-8 text encoding.
+
+## Feed Behavior And Standard Flags ## {#root-feed}
+
+### Universal Flags ### {#universal-flags}
+
+Every feed in a STaMP compliant server must have the following mandatory flags:
+
+<pre>
+├── META
+│   ├── NAME
+│   └── DESCRIPTION
+└── STATUS
+</pre>
+
+: NAME
+:: A flag with a string value containing the name of the feed. For user feeds, this flag may contain their username. Likewise, for chatroom feeds, this flag may contain the name of the chatroom.
+: DESCRIPTION
+:: A flag with a string value containing a description of the feed. For user feeds, this flag may contain user-written introductions or short bibliographies. For chatroom feeds, this flag can be used to hold the topic of discussion or any other free-form text.
+: STATUS
+:: A flag with a string value containing the current status of the feed. This flag must conform to the following syntax:
+
+<pre class="railroad">
+Choice:
+    T: online
+    T: offline
+</pre>
+
+:: For user feeds, this flag must be set to "online" if the user is actively authenticated to the server or "offline" if the user is offline. For chatroom feeds, this flag may be set to "offline" if so desired by an admin.
+
+
+### Root Feed Flags ### {#root-feed-flags}
+
+Upon startup, every STaMP server must create a root feed with the following flag structure:
+
+<pre>
+└── SERVER
+    ├── META
+    │   ├── NAME
+    │   ├── VERSION
+    │   └── PROTOCOL_VERSION
+    ├── MOTD
+    └── STAT
+        └── NUM_SUBFEEDS
+</pre>
+
+### User Authentication and Connection
+
+## Standard Ports ## {#standard-ports}
+
+For STaMP servers listening for connections over TCP/IP, the following port numbers are preferred.
+<pre class="simpledef">
+5757: Default and preferred STaMP server port.
+6868: Alternative STaMP server port.
+</pre>
+
+Clients should attempt to connect to the preferred port, and fall back to the alternative port if no connection can be established. For STaMP servers using other connection methods, such as [[RFC6455]], this is not applicable.
+
+## Exceptions ## {#exceptions}
+
