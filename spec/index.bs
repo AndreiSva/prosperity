@@ -59,16 +59,29 @@ STaMP's permission model is entirely based around the hierarchical nature of fee
 
 ## Flag Dot Notation ## {#flag-dot-notation}
 
-Dot notation can be used to retrieve or set flag values of any specified feed. The simple syntax can be expressed in the following railroad notation:
+Dot notation can be used to retrieve or set flag values of any specified feed. The simple syntax can be expressed in the following railroad diagram:
 
 <pre class="railroad">
-T: <BASEFLAG>
+T: <BASE-FLAG>
 ZeroOrMore:
     T: .
-    T: <SUBFLAG>
+T: <SUB-FLAG>
 </pre>
 
 ## STaMP Feed Address Syntax ## {#stamp-feed-address}
+
+The Feed Address Syntax (FAS) is the fundamental method of addressing feeds withing the STaMP protocol. FAS can be essentially understood as an extension to the email address syntax described in [[RFC5322]]. The syntax of FAS can be seen in the following railroad diagram:
+
+<pre class="railroad">
+T: <BASE-FEED-NAME>
+OneOrMore:
+    T: <SUBFEED-NAME>
+    T: @
+</pre>
+
+<div class="example">
+The FAS address `user@channel@example.com` is used to address the feed with the name "user" that is a subfeed of the feed with the name "channel" which itself is a child of the feed with the name "example.com"
+</div>
 
 # STaMP Methods
 
