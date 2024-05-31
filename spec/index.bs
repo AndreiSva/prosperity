@@ -35,7 +35,7 @@ User: A person who connects to a STaMP server using a client for the intent of c
 Chatroom: A shared communication channel containing multiple users.
 </pre>
 
-Unless otherwise specified, the value of flags as described in [[#root-feed]] must be assumed to be 0.
+Unless otherwise specified, the value of flags as described in [[#root-feed]] must be assumed to be the character "0".
 
 # High-Level Specification Overview # {#Spec-Overview}
 
@@ -45,15 +45,19 @@ There are only two distinct object types present in the STaMP protocol, namely *
 
 Feeds are a hierarchical object structure used to model communication and relational structures across the specification. They are used to model chat users, chatrooms, and the server itself.
 
-One of the most important properties of feeds is their ability to contain an arbitrary number of subfeeds, also called children feeds. A feed can additionally have any number of flags, as discussed in [[#flags]].
+One of the most important properties of feeds is their ability to contain an arbitrary number of subfeeds, also called children feeds. A feed can additionally have any number of flags, as discussed in [[#flags]]. Additionally, feeds are conceptually similar to a linked-list in that each feed holds a conceptual reference to another, as described in [[#method-stamp-follow]].
 
 Every feed must have a name flag, which used for addressing purposes as described in [[#stamp-feed-address]].
 
 In its initial state, a STaMP server begins with a single feed, called the **root feed**, as described in [[#root-feed]].
 
+The properties of flags makes them ideal for representing user messages, clients, and chatrooms.
+
 ## Flags ## {#flags}
 
-STaMP's permission model is entirely based around the hierarchical nature of feeds. Specifically, parent feeds always have direct permission privilege over their child feeds.
+STaMP flags are a way of attaching options and metadata to feeds.
+
+STaMP's permission model is entirely based around the hierarchical nature of feeds. Specifically, parent feeds always have direct permission privilege over their child feeds and pass on their feeds values to their child feed. In other words, subfeeds inherit all flag values from their parents. By default, feeds are able to modify their own flags, overwriting the options inherited from their parents. However, this behavior can be changed by prefixing the flag name with an asterisk symbol, which makes it impossible for child feeds to modify the inherited value of the flag. 
 
 # Protocol Syntax # {#spec-syntax}
 
@@ -65,12 +69,12 @@ Dot notation can be used to retrieve or set flag values of any specified feed. T
 T: <BASE-FLAG>
 ZeroOrMore:
     T: .
-T: <SUB-FLAG>
+    T: <SUB-FLAG>
 </pre>
 
 ## STaMP Feed Address Syntax ## {#stamp-feed-address}
 
-The Feed Address Syntax (FAS) is the fundamental method of addressing feeds withing the STaMP protocol. FAS can be essentially understood as an extension to the email address syntax described in [[RFC5322]]. The syntax of FAS can be seen in the following railroad diagram:
+The Feed Address Syntax is the fundamental method of addressing feeds withing the STaMP protocol. FAS can be essentially understood as an extension to the email address syntax described in [[RFC5322]]. The syntax of FAS can be seen in the following railroad diagram:
 
 <pre class="railroad">
 T: <BASE-FEED-NAME>
@@ -83,7 +87,20 @@ OneOrMore:
 The FAS address `user@channel@example.com` is used to address the feed with the name "user" that is a subfeed of the feed with the name "channel" which itself is a child of the feed with the name "example.com"
 </div>
 
-# STaMP Methods
+# STaMP Methods # {#methods}
+
+## STAMP-FOLLOW ## {#method-stamp-follow}
+
+## STAMP-CREATE ## {#method-stamp-follow}
+
+## STAMP-DELFLAG ## {#method-stamp-delete}
+
+## STAMP-DELFEED ## {#method-stamp-unset}
+
+## STAMP-QUERY ## {#method-stamp-query}
+
+## STAMP-SET ## {#method-stamp-set}
+
 
 # Server Requirements and Behavior # {#server-requirements}
 
@@ -94,6 +111,9 @@ All strings and text communicated through the STaMP protocol, as well as all CSV
 ## Feed Behavior And Standard Flags ## {#root-feed}
 
 ### Universal Flags ### {#universal-flags}
+
+
+#### META and STATUS #### {#universal-flags-metastatus}
 
 Every feed in a STaMP compliant server must have the following mandatory flags:
 
@@ -114,26 +134,29 @@ Every feed in a STaMP compliant server must have the following mandatory flags:
 <pre class="railroad">
 Choice:
     T: online
+    T: local
     T: offline
 </pre>
 
-:: For user feeds, this flag must be set to "online" if the user is actively authenticated to the server or "offline" if the user is offline. For chatroom feeds, this flag may be set to "offline" if so desired by an admin.
+:: For user feeds, this flag must be set to "online" or "local" if the user is actively authenticated to the server or "offline" if the user is offline. For chatroom feeds, this flag may be set to "offline" if so desired by an admin. For the root feed, this flag must be set to either "local" or "online." Feeds with a STATUS flag with a value of "local" must not allow the creation of pseudo feeds by feeds with a different root feed than itself.
 
+#### SERVER #### {#universal-flags-server}
 
-### Root Feed Flags ### {#root-feed-flags}
-
-Upon startup, every STaMP server must create a root feed with the following flag structure:
+Every feed in a STaMP server must have a dedicated `SERVER` flag, which contains information about the server software it is running.
 
 <pre>
-└── SERVER
-    ├── META
-    │   ├── NAME
-    │   ├── VERSION
-    │   └── PROTOCOL_VERSION
-    ├── MOTD
-    └── STAT
-        └── NUM_SUBFEEDS
+SERVER
+├── NAME
+├── VERSION
+└── PROTOCOL_VERSION
 </pre>
+
+: NAME
+:: A flag with a string value containing the name of the server software the STaMP server is running.
+: VERSION
+:: A flag with a string value containing the version of the server software the STaMP server is running.
+: PROTCOL_VERSION
+:: A flag with a string value containing the version of the STaMP protocol that the server supports. This value would be expressed by `STaMP/<version>`, where `<version>` is the version of the STaMP protocol used. For example, STaMP protocol version 1 would be expressed as `STaMP/1`
 
 ### User Authentication and Connection
 
@@ -147,5 +170,58 @@ For STaMP servers listening for connections over TCP/IP, the following port numb
 
 Clients should attempt to connect to the preferred port, and fall back to the alternative port if no connection can be established. For STaMP servers using other connection methods, such as [[RFC6455]], this is not applicable.
 
-## Exceptions ## {#exceptions}
+## Status Codes ## {#exceptions}
 
+In the case of an error, the STaMP server must return a valid exception. The general CSV syntax for error messages or general status is as follow.
+
+<pre class="example">
+STATUS,MESSAGE
+&lt;code&gt;,&lt;message&gt;
+</pre>
+
+Where `<code>` is the status name and `<message>` is an optional description of the cause of the error.
+
+### EOK ### {#error-ok}
+
+The `EOK` status is sent when a method is completed without any errors.
+
+<pre class="example">
+STATUS,MESSAGE
+EOK,
+</pre>
+
+### ESYNTAX ### {#error-esyntax}
+
+In the event that an incorrectly formatted CSV table or incorrect syntax is sent to the STaMP server, the server must reply with a `ESYNTAX` error.
+
+<pre class="example">
+STATUS,MESSAGE
+ESYNTAX,"Invalid CSV"
+</pre>
+
+### EBANNED ### {#error-ebanned}
+
+If an IP or account is banned, the `EBANNED` error will be thrown to the offending client. The message field of this exception must be either an empty string or the reason for the ban.
+
+<pre class="example">
+STATUS,MESSAGE
+EBANNED,"Spam"
+</pre>
+
+### EFORBIDDEN ### {#error-forbidden}
+
+If a user doesn't have permission to perform an action, the `EFORBIDDEN` exception must be thrown.
+
+<pre class="example">
+STATUS,MESSAGE
+EFORBIDDEN,"Forbidden"
+</pre>
+
+### EFAIL ### {#error-fail}
+
+The `EFAIL` exception is thrown if an error occurs on the STaMP server for reasons unrelated to the user's action.
+
+<pre class="example">
+STATUS,MESSAGE
+EFAIL,"Exception thrown at server.cpp:320"
+</pre>
