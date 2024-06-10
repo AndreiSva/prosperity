@@ -59,6 +59,10 @@ STaMP flags are a way of attaching options and metadata to feeds.
 
 STaMP's permission model is entirely based around the hierarchical nature of feeds. Specifically, parent feeds always have direct permission privilege over their child feeds and pass on their feeds values to their child feed. In other words, subfeeds inherit all flag values from their parents. By default, feeds are able to modify their own flags, overwriting the options inherited from their parents. However, this behavior can be changed by prefixing the flag name with an asterisk symbol, which makes it impossible for child feeds to modify the inherited value of the flag. 
 
+## Connections ## {#connections}
+
+Connections to a STaMP server can be initiated by users or by other STaMP servers.
+
 # Protocol Syntax # {#spec-syntax}
 
 ## Flag Dot Notation ## {#flag-dot-notation}
@@ -89,7 +93,35 @@ The FAS address `user@channel@example.com` is used to address the feed with the 
 
 # STaMP Methods # {#methods}
 
-## STAMP-FOLLOW ## {#method-stamp-follow}
+## STAMP-AUTH ## {#method-stamp-auth}
+
+The `STAMP-AUTH` method must be called immediately once a connection is established between a client and a STaMP server.
+
+<div class="example">
+STAMP-AUTH request:
+<pre>
+METHOD,STAMP-AUTH
+USER,&lt;user&gt;
+PASS,&lt;pass&gt;
+DOMAIN,&lt;domain&gt;
+</pre>
+</div>
+
+<div class="example">
+STAMP-AUTH response:
+<pre>
+FEED,&lt;user&gt;@&lt;hostname&gt;
+KEEPALIVE-TIMER,60
+</pre>
+</div>
+
+## STAMP-KEEPALIVE ## {#method-stamp-keepalive}
+
+<pre class="example">
+METHOD,STAMP-KEEPALIVE
+</pre>
+
+## STAMP-NEXT ## {#method-stamp-follow}
 
 ## STAMP-CREATE ## {#method-stamp-follow}
 
@@ -111,7 +143,6 @@ All strings and text communicated through the STaMP protocol, as well as all CSV
 ## Feed Behavior And Standard Flags ## {#root-feed}
 
 ### Universal Flags ### {#universal-flags}
-
 
 #### META and STATUS #### {#universal-flags-metastatus}
 
@@ -210,7 +241,7 @@ EBANNED,"Spam"
 
 ### EFORBIDDEN ### {#error-forbidden}
 
-If a user doesn't have permission to perform an action, the `EFORBIDDEN` exception must be thrown.
+If a user does not have permission to perform an action, the `EFORBIDDEN` exception must be thrown.
 
 <pre class="example">
 STATUS,MESSAGE

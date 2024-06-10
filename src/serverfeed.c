@@ -77,3 +77,7 @@ void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed) {
 	}
 	head->subfeeds = child_feed;
 }
+
+void serverFlag_set_value(serverFlag* root_flag, char* flag_string, char* value) {
+
+}
