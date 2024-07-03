@@ -115,7 +115,7 @@ CSValue CSValue_parse(char* csv_string) {
 				if (current_pos == 0) {
 					previous = '\n';
 				} else {
-		 			previous = csv_string[current_pos - 1];
+					previous = csv_string[current_pos - 1];
 				}
 
 				char next = csv_string[current_pos + 1];

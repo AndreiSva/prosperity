@@ -70,10 +70,11 @@ void serverClient_free(serverClient* client, int client_sockfd);
 int serverInstance_event_loop(serverOptions options);
 
 serverFlag* serverFlag_new(char* flag_name, char* flag_value);
+serverFlag* serverFlag_get_byaddr(serverFlag* root_flag, char* addr);
 void serverFlag_add_subflag(serverFlag* parent_flag, serverFlag* subflag);
 void serverFlag_free(serverFlag* flag);
 
-serverFeed serverFeed_new(serverFeed* parent_feed, serverFlag* flags);
+serverFeed* serverFeed_new(serverFeed* parent_feed, serverFlag* flags);
 void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed);
 void serverFeed_delete_subfeed(serverFeed* parent_feed, uint64_t child_index);
 void serverFeed_free(serverFeed* feed);

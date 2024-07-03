@@ -24,11 +24,14 @@ void serverFlag_free(serverFlag* flag) {
 	free(flag->flag_value);
 
 	if (flag->subflags != NULL) {
-		serverFlag* head = flag;
+		serverFlag* head = flag->subflags;
+
 		while (head->pnext_flag != NULL) {
 			head = head->pnext_flag;
 			serverFlag_free(head);
 		}
+
+        serverFlag_free(head);
 	}
 
 	free(flag);
@@ -43,27 +46,27 @@ void serverFlag_add_subflag(serverFlag* parent_flag, serverFlag* subflag) {
 }
 
 
-serverFeed serverFeed_new(serverFeed* parent_feed, serverFlag* flags) {
-	serverFeed new_feed = {
-		.client = NULL,
-		.parent_feed = parent_feed,
-		.flags = flags,
-		.subfeeds = xmalloc(sizeof(serverFeed)),
-	};
-
+serverFeed* serverFeed_new(serverFeed* parent_feed, serverFlag* flags) {
+    serverFeed* new_feed = xmalloc(sizeof(serverFeed));
+    new_feed->client = NULL;
+    new_feed->parent_feed = parent_feed;
+    new_feed->flags = flags;
+    new_feed->subfeeds = NULL;
+    
 	return new_feed;
 }
 
 void serverFeed_free(serverFeed* feed) {
+    // note: this does not free the client associated to the feed
 	serverFlag* head = feed->flags;
 	while (head != NULL) {
-		head = head->subflags;
+		head = head->pnext_flag;
 		serverFlag_free(head);
 	}
 
 	serverFeed* head_feed = feed->subfeeds;
 	while (head_feed != NULL) {
-		head_feed = head_feed->subfeeds;
+		head_feed = head_feed->pnext_serverfeed;
 		serverFeed_free(head_feed);
 	}
 
@@ -73,11 +76,31 @@ void serverFeed_free(serverFeed* feed) {
 void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed) {
 	serverFeed* head = parent_feed->subfeeds;
 	while (head != NULL) {
-		head = head->subfeeds;
+		head = head->pnext_serverfeed;
 	}
-	head->subfeeds = child_feed;
+	head->pnext_serverfeed = child_feed;
 }
 
-void serverFlag_set_value(serverFlag* root_flag, char* flag_string, char* value) {
+serverFlag* serverFlag_get_flag(serverFlag* root_flag, char* flag_name) {
+	serverFlag* head = root_flag->subflags;
+	while (head != NULL) {
+		head = head->pnext_flag;
+	}
+	return head->pnext_flag;
+}
 
+serverFlag* serverFlag_get_byaddr(serverFlag* root_flag, char* addr) {
+    char* dot = strchr(addr, '.');
+    if (dot != NULL) {
+        dot++;
+        char* new_root = strchr(dot, '.');
+        *new_root = '\0';
+        return serverFlag_get_flag(root_flag, new_root);
+    } else {
+        return serverFlag_get_flag(root_flag, addr);
+    }
+}
+
+serverFeed* serverFeed_new(serverFeed* root_feed, char* feed_name) {
+    
 }
