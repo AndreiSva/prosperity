@@ -9,6 +9,7 @@
 
 #define MAX_EVENTS 10
 #define MAX_RETRY 3
+#define ERROR_STRING_SIZE 256
 
 #define MSG_MAX 1024
 
@@ -294,8 +295,8 @@ int serverInstance_event_loop(serverOptions options) {
 					}
 					
 					if (main_instance.debug_mode) {
-						char error_string[256];
-						ERR_error_string_n(ERR_get_error(), error_string, 256);
+						char error_string[ERROR_STRING_SIZE];
+						ERR_error_string_n(ERR_get_error(), error_string, ERROR_STRING_SIZE);
 						server_DEBUG(&main_instance, error_string);
 					}
 				}
