@@ -33,7 +33,11 @@ static void serverClient_free(serverClient *client, int client_sockfd) {
 }
 
 serverClient* clientTable_get(clientTable* table, int client_sockfd) {
-	return table->clients[client_sockfd];
+    if (table->clients != NULL) {
+        return table->clients[client_sockfd];
+    } else {
+        return NULL;
+    }
 }
 
 void clientTable_index(clientTable* table, serverClient* client, int client_sockfd) {
@@ -235,9 +239,9 @@ int serverInstance_event_loop(serverOptions options) {
 	serverInstance_setup(&main_instance, options);
 
 	struct epoll_event events[MAX_EVENTS];
-	is_running = &main_instance.running;
 
 	// handle ctrl-c
+	is_running = &main_instance.running;
 	struct sigaction sigint_action = {
 		.sa_handler = handle_sigint,
 		.sa_flags = 0,
