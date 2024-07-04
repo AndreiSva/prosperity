@@ -26,12 +26,12 @@ void serverFlag_free(serverFlag* flag) {
 	if (flag->subflags != NULL) {
 		serverFlag* head = flag->subflags;
 
-		while (head->pnext_flag != NULL) {
-			head = head->pnext_flag;
+		while (head != NULL) {
+			serverFlag* tmp = head->pnext_flag;
 			serverFlag_free(head);
+            head = tmp;
 		}
 
-        serverFlag_free(head);
 	}
 
 	free(flag);
@@ -39,10 +39,14 @@ void serverFlag_free(serverFlag* flag) {
 
 void serverFlag_add_subflag(serverFlag* parent_flag, serverFlag* subflag) {
 	serverFlag* head = parent_flag->subflags;
-	while (head != NULL) {
-		head = head->subflags;
-	}
-	head->subflags = subflag;
+    if (head != NULL) {
+        while (head->pnext_flag != NULL) {
+            head = head->pnext_flag;
+        }
+        head->pnext_flag = subflag;
+    } else {
+        parent_flag->subflags = subflag;
+    }
 }
 
 
@@ -60,14 +64,16 @@ void serverFeed_free(serverFeed* feed) {
     // note: this does not free the client associated to the feed
 	serverFlag* head = feed->flags;
 	while (head != NULL) {
-		head = head->pnext_flag;
+		serverFlag* tmp = head->pnext_flag;
 		serverFlag_free(head);
+        head = tmp;
 	}
 
 	serverFeed* head_feed = feed->subfeeds;
 	while (head_feed != NULL) {
-		head_feed = head_feed->pnext_serverfeed;
+		serverFeed* tmp = head_feed->pnext_serverfeed;
 		serverFeed_free(head_feed);
+        head_feed = tmp;
 	}
 
 	free(feed);
@@ -75,32 +81,57 @@ void serverFeed_free(serverFeed* feed) {
 
 void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed) {
 	serverFeed* head = parent_feed->subfeeds;
-	while (head != NULL) {
-		head = head->pnext_serverfeed;
-	}
-	head->pnext_serverfeed = child_feed;
+    if (head != NULL) {
+        while (head->pnext_serverfeed != NULL) {
+            head = head->pnext_serverfeed;
+        }
+        head->pnext_serverfeed = child_feed;
+    } else {
+        parent_feed->subfeeds = child_feed;
+    }
 }
 
 serverFlag* serverFlag_get_flag(serverFlag* root_flag, char* flag_name) {
 	serverFlag* head = root_flag->subflags;
-	while (head != NULL) {
+	while (head->pnext_flag != NULL) {
+        if (strcmp(head->flag_name, flag_name) == 0) {
+            return head;
+        }
 		head = head->pnext_flag;
 	}
-	return head->pnext_flag;
+	return NULL;
 }
 
 serverFlag* serverFlag_get_byaddr(serverFlag* root_flag, char* addr) {
+
+    // this way we leave the original address unmodified
+    char* addr_copy = xmalloc(strlen(addr) + 1);
+    strcpy(addr_copy, addr);
+    addr = addr_copy;
+
     char* dot = strchr(addr, '.');
     if (dot != NULL) {
         dot++;
-        char* new_root = strchr(dot, '.');
-        *new_root = '\0';
-        return serverFlag_get_flag(root_flag, new_root);
+        char* new_root_name = strchr(dot, '.');
+
+        // get the current address level
+        // eg: if we are at level 2 of foo.bar.bazz, return "bar"
+        // if we're at the terminal level, then there's no need to crop the new root
+        if (new_root_name != NULL) {
+            *new_root_name = '\0';
+        }
+
+        serverFlag* new_root = serverFlag_get_flag(root_flag, new_root_name);
+
+        // if we're not at the terminal level, add back the dot
+        if (new_root_name != NULL) {
+            *new_root_name = '.';
+        }
+
+        free(addr_copy);
+        return serverFlag_get_flag(new_root, dot);
     } else {
+        free(addr_copy);
         return serverFlag_get_flag(root_flag, addr);
     }
-}
-
-serverFeed* serverFeed_new(serverFeed* root_feed, char* feed_name) {
-    
 }

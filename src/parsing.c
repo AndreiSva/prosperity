@@ -75,6 +75,8 @@ static void cell_addchar(char** cell, size_t* cell_length, size_t* cell_size, ch
 }
 
 CSValue CSValue_parse(char* csv_string) {
+    // note: This function directly modifies csv_string. This is indented because the original CSV string is of no use after parsing.
+
 	CSValue csv = {
 		.cols = 1,
 		.rows = 1,
