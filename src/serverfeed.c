@@ -105,7 +105,7 @@ serverFlag* serverFlag_get_flag(serverFlag* root_flag, char* flag_name) {
 serverFlag* serverFlag_get_byaddr(serverFlag* root_flag, char* addr) {
 
     // this way we leave the original address unmodified
-    char* addr_copy = xmalloc(strlen(addr) + 1);
+    char addr_copy[strlen(addr) + 1];
     strcpy(addr_copy, addr);
     addr = addr_copy;
 
@@ -128,10 +128,8 @@ serverFlag* serverFlag_get_byaddr(serverFlag* root_flag, char* addr) {
             *new_root_name = '.';
         }
 
-        free(addr_copy);
         return serverFlag_get_flag(new_root, dot);
     } else {
-        free(addr_copy);
         return serverFlag_get_flag(root_flag, addr);
     }
 }
