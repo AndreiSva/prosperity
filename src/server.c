@@ -13,7 +13,17 @@
 
 #define MSG_MAX 1024
 
-void serverClient_free(serverClient *client, int client_sockfd) {
+static serverClient* serverClient_new(net_address client_address,
+                                      socklen_t client_address_size, SSL* sslobj) {
+    serverClient* new_client = xmalloc(sizeof(serverClient));
+    new_client->ssl_object = sslobj;
+    new_client->address = client_address;
+    new_client->addrlen = client_address_size;
+    return new_client;
+}
+
+
+static void serverClient_free(serverClient *client, int client_sockfd) {
 	SSL_shutdown(client->ssl_object);
 	SSL_free(client->ssl_object);
 	
@@ -264,11 +274,10 @@ int serverInstance_event_loop(serverOptions options) {
 					break;
 				}
 
-				// now we can create a new client object and add it to the root feed
-				serverClient* new_client = xmalloc(sizeof(serverClient));
-				new_client->ssl_object = sslobj;
-				new_client->address = client_address;
-				new_client->addrlen = client_address_size;
+				// now we can create a new client object, create a new feed and add the new feed to the root feed
+				serverClient* new_client = serverClient_new(client_address, client_address_size, sslobj); 
+                serverFeed* new_feed = serverFeed_new(&main_instance.rootfeed, serverFlag_new("USER", NULL));
+                new_feed->client = new_client;
 
 				// add the client to the server's client table
 				clientTable_index(&main_instance.client_table, new_client, client_sockfd);
