@@ -31,4 +31,8 @@ void CSValue_free(CSValue* csv);
 // returns the length of a utf-8 encoded string
 size_t ustrlen(char* ustr);
 
+int CSValue_index_colbyname(CSValue* csv, char* colname, uint32_t row);
+int CSValue_index_rowbyname(CSValue* csv, char* rowname, uint32_t col);
+
+
 #endif

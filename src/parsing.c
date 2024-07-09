@@ -7,6 +7,9 @@
 
 #define CSV_CELL_SIZE 256
 
+const char SEP = ',';
+const char QUOTE = '\"';
+
 bool isnumber(char* string) {
 	for (int i = 0; i < strlen(string); i++) {
 		if (!isdigit(string[i])) {
@@ -26,6 +29,24 @@ char* CSValue_get(CSValue* csv, uint32_t col, uint32_t row) {
 	}
 
 	return csv->table[col][row];
+}
+
+int CSValue_index_colbyname(CSValue* csv, char* colname, uint32_t row) {
+    for (int col = 0; col < csv->cols; col++) {
+        if (strcmp(CSValue_get(csv, col, row), colname) == 1) {
+            return col;
+        }
+    }
+    return -1;
+}
+
+int CSValue_index_rowbyname(CSValue* csv, char* rowname, uint32_t col) {
+    for (int row = 0; row < csv->rows; row++) {
+        if (strcmp(CSValue_get(csv, col, row), rowname) == 1) {
+            return row;
+        }
+    }
+    return -1;
 }
 
 // TODO: add more error checking here
@@ -66,6 +87,7 @@ static void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t r
 }
 
 static void cell_addchar(char** cell, size_t* cell_length, size_t* cell_size, char c) {
+    // append a char to a given cell
 	if (*cell_length >= *cell_size) {
 		*cell_size += CSV_CELL_SIZE;
 		*cell = xrealloc(*cell, *cell_size);
@@ -75,11 +97,18 @@ static void cell_addchar(char** cell, size_t* cell_length, size_t* cell_size, ch
 }
 
 CSValue CSValue_parse(char* csv_string) {
+
     // note: This function directly modifies csv_string. This is indented because the original CSV string is of no use after parsing.
 
+    // the actual CSValue structure is really just a thin wrapper around a 2d array,
+    // so we allocate these on the stack. Also, we bet on the fact that any string is valid CSV
+
+    // However, all CSValue_* functions accept a pointer to a CSValue.
 	CSValue csv = {
 		.cols = 1,
 		.rows = 1,
+
+        // table[col][row]
 		.table = xmalloc(sizeof(char**))
 	};
 
@@ -97,7 +126,7 @@ CSValue CSValue_parse(char* csv_string) {
 	bool quoted = false;
 	while (csv_string[current_pos] != '\0') {
 		switch (csv_string[current_pos]) {
-			case ',':
+			case SEP:
 				if (!quoted) {
 					// we are done recording the cell, we can add it to the table
 					cell[cell_string_length] = '\0';
@@ -111,7 +140,7 @@ CSValue CSValue_parse(char* csv_string) {
 					cell_addchar(&cell, &cell_string_length, &cell_string_size, csv_string[current_pos]);
 				}
 				break;
-			case '\"':
+			case QUOTE:
 				;
 				char previous;
 				if (current_pos == 0) {
@@ -122,15 +151,16 @@ CSValue CSValue_parse(char* csv_string) {
 
 				char next = csv_string[current_pos + 1];
 
-				if (previous == ',' || previous == '\n') {
+                // we only trigger a quote if a separator preceeds the quote
+				if (previous == SEP || previous == '\n') {
 					quoted = true;
 				}
 
-				if (next == ',' || next == '\n') {
+				if (next == SEP || next == '\n') {
 					quoted = false;
 				}
 
-				if (previous != ',' && previous != '\n' && next != ',' && next != '\n') {
+				if (previous != SEP && previous != '\n' && next != SEP && next != '\n') {
 					cell_addchar(&cell, &cell_string_length, &cell_string_size, csv_string[current_pos]);
 				}
 
@@ -180,20 +210,20 @@ void CSValue_put(FILE* stream, CSValue* csv) {
 			char* cell = CSValue_get(csv, j, i);
 
 			// if our cell contains a comma it means we should quote it
-			bool quoted = strchr(cell, ',') != NULL;
+			bool quoted = strchr(cell, SEP) != NULL;
 			
 			if (quoted) {
-				fputc('\"', stream);
+				fputc(QUOTE, stream);
 			}
 
 			fprintf(stream, "%s", cell);
 
 			if (quoted) {
-				fputc('\"', stream);
+				fputc(QUOTE, stream);
 			}
 
 			if (j != csv->cols - 1) {
-				fputc(',', stream);
+				fputc(SEP, stream);
 			}
 		}
 		fputc('\n', stream);
@@ -208,4 +238,7 @@ void CSValue_free(CSValue* csv) {
 		free(csv->table[i]);
 	}
 	free(csv->table);
+
+    // note how we explicitly do not deallocate `csv`, because it should be
+    // allocated on the stack
 }
