@@ -7,8 +7,8 @@
 
 #define CSV_CELL_SIZE 256
 
-const char SEP = ',';
-const char QUOTE = '\"';
+#define SEP ','
+#define QUOTE '\"'
 
 bool isnumber(char* string) {
 	for (int i = 0; i < strlen(string); i++) {
