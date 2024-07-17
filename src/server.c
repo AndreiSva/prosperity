@@ -271,6 +271,7 @@ static int serverInstance_accept_connection(
 	SSL_set_fd(*ssl_object, client_sockfd);
 	if (SSL_accept(*ssl_object) == -1) {
 		perror("TLS handshake failed");
+        SSL_free(*ssl_object);
 		return -1;
 	}
 
@@ -283,16 +284,18 @@ static char* serverInstance_gen_guestname(serverFeed* root_feed) {
     int rng = random() * 10000;
     int len = snprintf( NULL, 0, "%d", rng);
     char rng_string[len + 1];
-    snprintf(rng_string, 0, "%d", rng);
+    snprintf(rng_string, len + 1, "%d", rng);
 
     int size = strlen(guest_prefix) + len + 1;
     char* guestname = xmalloc(size);
+    guestname[0] = '\0';
 
     strcat(guestname, guest_prefix);
     strcat(guestname, rng_string);
 
     // don't create feeds with duplicate names accidentally
     if (serverFeed_get_feed(root_feed, guestname) != NULL) {
+        free(guestname);
         return serverInstance_gen_guestname(root_feed);
     }
 
