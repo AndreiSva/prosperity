@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 #include "parsing.h"
 #include "wrapper.h"
@@ -50,7 +51,7 @@ int CSValue_index_rowbyname(CSValue* csv, char* rowname, uint32_t col) {
 }
 
 // TODO: add more error checking here
-static void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t row) {
+void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t row) {
 	// if we want to add a cell outside of what we've allocated already, allocate the new memory
 
 	// cols
@@ -86,6 +87,28 @@ static void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t r
 	csv->table[col][row] = cell_string;
 }
 
+void CSValue_append_row(CSValue* csv, ...) {
+    // obviously, if you don't add NULL to the end of the arguments here you will run into some trouble
+    // va_arg() returns gibberish otherwise
+
+    va_list args;
+    va_start(args, csv);
+
+    char* cell_value;
+    int row = csv->rows;
+
+    cell_value = va_arg(args, char*);
+    int i = 0;
+    while (cell_value != NULL) {
+        CSValue_edit_cell(csv, cell_value, i, row);
+        cell_value = va_arg(args, char*);
+        i++;
+    }
+    
+    csv->rows++;
+    va_end(args);
+}
+
 static void cell_addchar(char** cell, size_t* cell_length, size_t* cell_size, char c) {
     // append a char to a given cell
 	if (*cell_length >= *cell_size) {
@@ -113,6 +136,10 @@ CSValue CSValue_parse(char* csv_string) {
 	};
 
 	csv.table[0] = calloc(1, sizeof(char*));
+
+    if (csv_string == NULL) {
+        return csv;
+    }
 
 	int current_col = -1; // set this to -1 because it will get incremented back to 0 right before we add the cell
 	int current_row = 0;

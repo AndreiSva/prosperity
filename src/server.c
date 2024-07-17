@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <time.h>
 #include <openssl/err.h>
 
 #include "server.h"
@@ -6,12 +7,47 @@
 #include "logging.h"
 #include "wrapper.h"
 #include "parsing.h"
+#include "error.h"
 
 #define MAX_EVENTS 10
 #define MAX_RETRY 3
 #define ERROR_STRING_SIZE 256
 
 #define MSG_MAX 1024
+
+void serverInstance_return_err(serverFeed* feed, uint16_t code, char* msg) {
+    CSValue err = CSValue_parse(NULL);
+    CSValue_append_row(&err, "MSGTYPE", "CODE", "CONTENT", NULL);
+
+    char code_string[256];
+    sprintf(code_string, "%d", code);
+    
+    CSValue_append_row(&err, "ERROR", code_string, msg, NULL);
+
+    serverFeed_send(feed, &err);
+    CSValue_free(&err);
+}
+
+static void serverInstance_route_message(serverInstance* main_instance, CSValue* message, serverFeed* sender) {
+    int rc = CSValue_index_colbyname(message, "COMMAND", 0);
+    if (rc == -1) {
+        serverInstance_return_err(sender, ERROR_CSV, "ERROR_CSV: Error reading CSV");
+        return;
+    }
+
+    int destination_index = CSValue_index_colbyname(message, "DESTINATION", 0);
+
+    if (destination_index != -1) {
+        for (int i = 1; i < message->rows; i++) {
+            char* destination_address = CSValue_get(message, destination_index, i);
+            serverFeed* destination = serverFeed_get_byaddr(main_instance->rootfeed, destination_address);
+            serverFeed_send(destination, message);
+        }
+    } else {
+        serverInstance_return_err(sender, ERROR_NODEST, "ERROR_NODEST: No destination for message");
+    }
+
+}
 
 static serverClient* serverClient_new(net_address client_address,
                                       socklen_t client_address_size, SSL* sslobj) {
@@ -23,12 +59,14 @@ static serverClient* serverClient_new(net_address client_address,
 }
 
 
-static void serverClient_free(serverClient *client, int client_sockfd) {
+static void serverClient_free(serverClient* client, int client_sockfd) {
 	SSL_shutdown(client->ssl_object);
 	SSL_free(client->ssl_object);
+
+    // note, we don't free the 'feed' field of the client struct because we expect it to be
+    // freed before the client
 	
 	close(client_sockfd);
-
 	free(client);
 }
 
@@ -83,13 +121,12 @@ static serverInstance serverInstance_init(serverOptions options) {
 			.clients = NULL,
 			.max_client = 0,
 		},
-		.rootfeed = {
-			.client = NULL,
-			.subfeeds = NULL,
-			.parent_feed = NULL,
-		},
 		.debug_mode = options.debug_mode
 	};
+
+    // create the root feed
+    // this is where all server-wide events will propagate from
+    result.rootfeed = serverFeed_new(NULL, NULL);
 
 	int use_ipv4 = !options.ipv6_only;
 	int sockopt_result = setsockopt(result.server_sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &use_ipv4, sizeof(use_ipv4));
@@ -103,6 +140,10 @@ static serverInstance serverInstance_init(serverOptions options) {
 
 static void serverInstance_cleanup(serverInstance* server_instance) {
 	server_LOG("Shutting Down Server...");
+
+    // free all the feeds
+    serverFeed_free(server_instance->rootfeed);
+
 	// free the clients and close the client sockets
 	for (int i = 0; i <= server_instance->client_table.max_client; i++) {
 		// free the remaining clients
@@ -228,6 +269,28 @@ static int serverInstance_accept_connection(
 	return client_sockfd;
 }
 
+static char* serverInstance_gen_guestname(serverFeed* root_feed) {
+    static const char* guest_prefix = "Guest";
+
+    int rng = random() * 10000;
+    int len = snprintf( NULL, 0, "%d", rng);
+    char rng_string[len + 1];
+    snprintf(rng_string, 0, "%d", rng);
+
+    int size = strlen(guest_prefix) + len + 1;
+    char* guestname = xmalloc(size);
+
+    strcat(guestname, guest_prefix);
+    strcat(guestname, rng_string);
+
+    // don't create feeds with duplicate names accidentally
+    if (serverFeed_get_feed(root_feed, guestname) != NULL) {
+        return serverInstance_gen_guestname(root_feed);
+    }
+
+    return guestname;
+}
+
 static bool* is_running = NULL;
 static void handle_sigint(int sig) {
 	*is_running = false;
@@ -239,6 +302,7 @@ int serverInstance_event_loop(serverOptions options) {
 	serverInstance_setup(&main_instance, options);
 
 	struct epoll_event events[MAX_EVENTS];
+    srand(time(NULL));
 
 	// handle ctrl-c
 	is_running = &main_instance.running;
@@ -279,9 +343,12 @@ int serverInstance_event_loop(serverOptions options) {
 				}
 
 				// now we can create a new client object, create a new feed and add the new feed to the root feed
-				serverClient* new_client = serverClient_new(client_address, client_address_size, sslobj); 
-                serverFeed* new_feed = serverFeed_new(&main_instance.rootfeed, serverFlag_new("USER", NULL));
+				serverClient* new_client = serverClient_new(client_address, client_address_size, sslobj);
+
+                serverFeed* new_feed = serverFeed_new(main_instance.rootfeed, serverInstance_gen_guestname(main_instance.rootfeed));
                 new_feed->client = new_client;
+
+                new_client->feed = new_feed;
 
 				// add the client to the server's client table
 				clientTable_index(&main_instance.client_table, new_client, client_sockfd);
@@ -321,6 +388,8 @@ int serverInstance_event_loop(serverOptions options) {
 
 					CSValue client_data = CSValue_parse(buf);
 					CSValue_put(stdout, &client_data);
+
+                    serverInstance_route_message(&main_instance, &client_data, clientTable_get(&main_instance.client_table, active_fd)->feed);
 
 					CSValue_free(&client_data);
 				} else if (bytes == 0 ) {

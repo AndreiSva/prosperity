@@ -12,6 +12,7 @@
 #include <errno.h>
 
 #include "serveroptions.h"
+#include "parsing.h"
 
 typedef struct sockaddr_in6 net_address;
 
@@ -19,21 +20,13 @@ typedef struct {
 	net_address address;
 	socklen_t addrlen;
 	SSL* ssl_object;
+    struct serverFeed* feed;
 } serverClient;
-
-typedef struct serverFlag {
-	char* flag_name;
-	char* flag_value;
-	
-	struct serverFlag* subflags;
-	struct serverFlag* pnext_flag;
-
-	bool inherit;
-} serverFlag;
 
 typedef struct serverFeed {
 	serverClient* client;
-	serverFlag* flags;
+
+    char* feed_name;
 	
 	struct serverFeed* parent_feed;
 
@@ -49,7 +42,7 @@ typedef struct {
 typedef struct {
 	serverOptions options;
 	int server_sockfd;
-	serverFeed rootfeed;
+	serverFeed* rootfeed;
 	clientTable client_table;
 	
 	SSL_CTX* sslctx;
@@ -67,14 +60,12 @@ void clientTable_remove(clientTable* table, int client_sockfd);
 
 int serverInstance_event_loop(serverOptions options);
 
-serverFlag* serverFlag_new(char* flag_name, char* flag_value);
-serverFlag* serverFlag_get_byaddr(serverFlag* root_flag, char* addr);
-void serverFlag_add_subflag(serverFlag* parent_flag, serverFlag* subflag);
-void serverFlag_free(serverFlag* flag);
-
-serverFeed* serverFeed_new(serverFeed* parent_feed, serverFlag* flags);
+serverFeed* serverFeed_new(serverFeed* parent_feed, char* feed_name);
+serverFeed* serverFeed_get_feed(serverFeed* parent_feed, char* feed_name);
+serverFeed* serverFeed_get_byaddr(serverFeed* parent_feed, char* addr);
 void serverFeed_add_subfeed(serverFeed* parent_feed, serverFeed* child_feed);
 void serverFeed_delete_subfeed(serverFeed* parent_feed, uint64_t child_index);
 void serverFeed_free(serverFeed* feed);
+void serverFeed_send(serverFeed* recipient, CSValue* message);
 
 #endif
