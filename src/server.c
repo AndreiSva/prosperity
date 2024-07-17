@@ -29,22 +29,30 @@ void serverInstance_return_err(serverFeed* feed, uint16_t code, char* msg) {
 }
 
 static void serverInstance_route_message(serverInstance* main_instance, CSValue* message, serverFeed* sender) {
-    int rc = CSValue_index_colbyname(message, "COMMAND", 0);
-    if (rc == -1) {
-        serverInstance_return_err(sender, ERROR_CSV, "ERROR_CSV: Error reading CSV");
+    int msgtype_index = CSValue_index_colbyname(message, "MSGTYPE", 0);
+
+    if (msgtype_index == -1) {
+        serverInstance_return_err(sender, ERROR_NOTYPE, "ERROR_NOTYPE: No message type for message");
         return;
     }
 
     int destination_index = CSValue_index_colbyname(message, "DESTINATION", 0);
 
-    if (destination_index != -1) {
-        for (int i = 1; i < message->rows; i++) {
-            char* destination_address = CSValue_get(message, destination_index, i);
-            serverFeed* destination = serverFeed_get_byaddr(main_instance->rootfeed, destination_address);
-            serverFeed_send(destination, message);
+    if (destination_index == -1) {
+        serverInstance_return_err(sender, ERROR_NODEST, "ERROR_NODEST: No destination feed for message");
+        return;
+    }
+
+    for (int i = 1; i < message->rows; i++) {
+        char* destination_address = CSValue_get(message, destination_index, i);
+        serverFeed* destination = serverFeed_get_byaddr(main_instance->rootfeed, destination_address);
+
+        if (destination == NULL) {
+            serverInstance_return_err(sender, ERROR_INVALIDDEST, "ERROR_INVALIDDEST: Destination address for message could not be resolved to a valid feed");
+            return;
         }
-    } else {
-        serverInstance_return_err(sender, ERROR_NODEST, "ERROR_NODEST: No destination for message");
+
+        serverFeed_send(destination, message);
     }
 
 }
