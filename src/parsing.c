@@ -93,6 +93,8 @@ void CSValue_append_row(CSValue* csv, ...) {
     va_list args;
     va_start(args, csv);
 
+    csv->rows++;
+
     int i = 0;
     char* cell_value = va_arg(args, char*);
     
@@ -102,7 +104,6 @@ void CSValue_append_row(CSValue* csv, ...) {
         i++;
     }
     
-    csv->rows++;
     va_end(args);
 }
 
@@ -112,18 +113,18 @@ void CSValue_append_col(CSValue* csv, char* colname, ...) {
     va_list args;
     va_start(args, colname);
 
+    csv->cols++;
     CSValue_edit_cell(csv, colname, csv->cols - 1, 0);
 
     int i = 1;
     char* cell_value = va_arg(args, char*);
 
     while (cell_value != NULL) {
-        CSValue_edit_cell(csv, cell_value, csv->cols, i);
+        CSValue_edit_cell(csv, cell_value, csv->cols - 1, i);
         cell_value = va_arg(args, char*);
         i++;
     }
 
-    csv->cols++;
     va_end(args);
 }
 
@@ -146,8 +147,8 @@ CSValue CSValue_parse(char* csv_string) {
 
     // However, all CSValue_* functions accept a pointer to a CSValue.
 	CSValue csv = {
-		.cols = 1,
-		.rows = 1,
+		.cols = 0,
+		.rows = 0,
 
         // table[col][row]
 		.table = xmalloc(sizeof(char**))
@@ -255,9 +256,11 @@ void CSValue_put(FILE* stream, CSValue* csv) {
 			char* cell = CSValue_get(csv, j, i);
 
 			// if our cell contains a comma, newline, or quotes it means we should quote it
+
+            // the issue is below because cell is null when it shouldn't be because rows and cols is innacurate
 			bool quoted = strchr(cell, SEP) != NULL
                 || strchr(cell, '\n') != NULL
-                || strchr(cell, QUOTE);
+                || strchr(cell, QUOTE) != NULL;
 			
 			if (quoted) {
 				fputc(QUOTE, stream);

@@ -18,14 +18,16 @@
 
 #define CLIENT_TABLE_SIZE 1024
 
+#define GUEST_POSTFIX_MULTIPLIER 10000
+
 void serverInstance_return_err(serverFeed* feed, uint16_t code, char* msg) {
     CSValue err = CSValue_parse(NULL);
-    CSValue_append_row(&err, "MSGTYPE", "CODE", "CONTENT", NULL);
+    CSValue_append_row(&err, "SENDER", "MSGTYPE", "CODE", "CONTENT", NULL);
 
     char code_string[256];
     sprintf(code_string, "%d", code);
     
-    CSValue_append_row(&err, "ERROR", code_string, msg, NULL);
+    CSValue_append_row(&err, "@", "STaMP-error", code_string, msg, NULL);
 
     serverFeed_send(feed, &err);
     CSValue_free(&err);
@@ -302,7 +304,7 @@ static int serverInstance_accept_connection(
 static char* serverInstance_gen_guestname(serverFeed* root_feed) {
     static const char* guest_prefix = "Guest";
 
-    int rng = random() * 10000;
+    int rng = random() * GUEST_POSTFIX_MULTIPLIER;
     int len = snprintf( NULL, 0, "%d", rng);
     char rng_string[len + 1];
     snprintf(rng_string, len + 1, "%d", rng);

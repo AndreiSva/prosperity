@@ -94,7 +94,19 @@ serverFeed* serverFeed_get_byaddr(serverFeed* root_feed, char* addr) {
 void serverFeed_send(serverFeed* recipient, CSValue* message) {
     serverFeed* head = recipient->subfeeds;
 
-    // TODO: Actually do something with the message
+    FILE* message_file = tmpfile();
+    CSValue_put(message_file, message);
+
+    fseek(message_file, 0, SEEK_END);
+    size_t message_size = ftell(message_file);
+    rewind(message_file);
+
+    char buf[message_size + 1];
+    fread(buf, message_size, 1, message_file);
+    fclose(message_file);
+
+    size_t written;
+    int write_result = SSL_write_ex(recipient->client->ssl_object, buf, message_size, &written);
 
     while (head != NULL) {
         serverFeed_send(head, message);
