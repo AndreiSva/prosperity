@@ -16,11 +16,13 @@
 
 typedef struct sockaddr_in6 net_address;
 
-typedef struct {
+typedef struct serverClient {
+    int sockfd;
 	net_address address;
 	socklen_t addrlen;
 	SSL* ssl_object;
     struct serverFeed* feed;
+    struct serverClient* pnext_serverclient;
 } serverClient;
 
 typedef struct serverFeed {
@@ -36,7 +38,6 @@ typedef struct serverFeed {
 
 typedef struct {
 	serverClient** clients;
-	uint32_t max_client;
 } clientTable;
 
 typedef struct {
@@ -54,9 +55,9 @@ typedef struct {
 	bool debug_mode;
 } serverInstance;
 
-void clientTable_index(clientTable* table, serverClient* client, int client_sockfd);
+void clientTable_index(clientTable* table, serverClient* client);
 serverClient* clientTable_get(clientTable* table, int client_sockfd);
-void clientTable_remove(clientTable* table, int client_sockfd);
+void clientTable_remove(clientTable* table, serverClient* client);
 
 int serverInstance_event_loop(serverOptions options);
 

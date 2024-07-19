@@ -1,6 +1,7 @@
 #include <signal.h>
 #include <time.h>
 #include <openssl/err.h>
+#include <assert.h>
 
 #include "server.h"
 
@@ -14,6 +15,8 @@
 #define ERROR_STRING_SIZE 256
 
 #define MSG_MAX 1024
+
+#define CLIENT_TABLE_SIZE 1024
 
 void serverInstance_return_err(serverFeed* feed, uint16_t code, char* msg) {
     CSValue err = CSValue_parse(NULL);
@@ -63,60 +66,78 @@ static serverClient* serverClient_new(net_address client_address,
     new_client->ssl_object = sslobj;
     new_client->address = client_address;
     new_client->addrlen = client_address_size;
+    new_client->pnext_serverclient = NULL;
     return new_client;
 }
 
 
-static void serverClient_free(serverClient* client, int client_sockfd) {
+static void serverClient_free(serverClient* client) {
 	SSL_shutdown(client->ssl_object);
 	SSL_free(client->ssl_object);
 
+    serverClient* head = client->pnext_serverclient;
+    if (head != NULL) {
+        serverClient_free(head);
+    }
+
     // note, we don't free the 'feed' field of the client struct because we expect it to be
     // freed before the client
-	
-	close(client_sockfd);
+
+    close(client->sockfd);
 	free(client);
 }
 
 serverClient* clientTable_get(clientTable* table, int client_sockfd) {
-    if (table->clients != NULL) {
-        return table->clients[client_sockfd];
+    uint64_t hash = client_sockfd % CLIENT_TABLE_SIZE;
+    serverClient* client = table->clients[hash];
+    if (client != NULL) {
+        serverClient* head = client->pnext_serverclient;
+        while (head != NULL) {
+            if (head->sockfd == client_sockfd) {
+                return head;
+            }
+            head = head->pnext_serverclient;
+        }
+
+        return client;
     } else {
         return NULL;
     }
 }
 
-void clientTable_index(clientTable* table, serverClient* client, int client_sockfd) {
-	// TODO: Make this more efficient
-	// This version isn't particularly efficient because it has to reallocate the entire array
-	// every time a new client is added. Should probably allocate in chunks of 10 or something
-	if (table->max_client <= client_sockfd) {
-		size_t new_size = (client_sockfd + 1) * sizeof(serverClient*);
-		table->clients = xrealloc(table->clients, new_size);
-		
-		// initialize the new clients to NULL
-		memset(&table->clients[table->max_client + 1], 0, (client_sockfd - table->max_client) * sizeof(serverClient*));
-		
-		table->max_client = client_sockfd;
-	}
-	table->clients[client_sockfd] = client;
+void clientTable_index(clientTable* table, serverClient* client) {
+    uint64_t hash = client->sockfd % CLIENT_TABLE_SIZE;
+
+    if (table->clients[hash] != NULL) {
+        serverClient* head = table->clients[hash];
+        while (head->pnext_serverclient != NULL) {
+            head = head->pnext_serverclient;
+        }
+        head->pnext_serverclient = client;
+    } else {
+        table->clients[hash] = client;
+    }
 }
 
-void clientTable_remove(clientTable* table, int client_sockfd) {
-	serverClient* removed_client = clientTable_get(table, client_sockfd);
-	if (removed_client == NULL) {
-		return;
-	}
-	serverClient_free(removed_client, client_sockfd);
-	table->clients[client_sockfd] = NULL;
-	if (client_sockfd == table->max_client) {
-		for (int i = client_sockfd; i >= 0; i--) {
-			if (table->clients[i] != NULL) {
-				table->max_client = i;
-				break;
-			}
-		}
-	}
+void clientTable_remove(clientTable* table, serverClient* client) {
+    uint64_t hash = client->sockfd % CLIENT_TABLE_SIZE;
+    serverClient* head = table->clients[hash];
+
+    if (table->clients[hash]->pnext_serverclient != NULL) {
+        while (head->pnext_serverclient != NULL) {
+            if (head->pnext_serverclient->sockfd == client->sockfd) {
+                serverClient* next_head = head->pnext_serverclient->pnext_serverclient;
+                head->pnext_serverclient = next_head;
+                break;
+            } else {
+                head = head->pnext_serverclient;
+            }
+        }
+    } else {
+        table->clients[client->sockfd] = NULL;
+    }
+
+	serverClient_free(client);
 }
 
 static serverInstance serverInstance_init(serverOptions options) {
@@ -126,8 +147,7 @@ static serverInstance serverInstance_init(serverOptions options) {
 		.running = true,
 		.sslctx = NULL,
 		.client_table = {
-			.clients = NULL,
-			.max_client = 0,
+			.clients = xmalloc(sizeof(serverClient*) * CLIENT_TABLE_SIZE),
 		},
 		.debug_mode = options.debug_mode
 	};
@@ -153,9 +173,10 @@ static void serverInstance_cleanup(serverInstance* server_instance) {
     serverFeed_free(server_instance->rootfeed);
 
 	// free the clients and close the client sockets
-	for (int i = 0; i <= server_instance->client_table.max_client; i++) {
+	for (int i = 0; i < CLIENT_TABLE_SIZE; i++) {
 		// free the remaining clients
-		clientTable_remove(&server_instance->client_table, i);
+        serverClient* current_client = clientTable_get(&server_instance->client_table, i);
+		clientTable_remove(&server_instance->client_table, current_client);
 	}
 
 	SSL_CTX_free(server_instance->sslctx);
@@ -360,9 +381,10 @@ int serverInstance_event_loop(serverOptions options) {
                 new_feed->client = new_client;
 
                 new_client->feed = new_feed;
+                new_client->sockfd = client_sockfd;
 
 				// add the client to the server's client table
-				clientTable_index(&main_instance.client_table, new_client, client_sockfd);
+				clientTable_index(&main_instance.client_table, new_client);
 			} else {
 				// recieve / send data
 				char buf[MSG_MAX];
@@ -381,7 +403,11 @@ int serverInstance_event_loop(serverOptions options) {
 					// unrecoverable errors :(
 					if (error == SSL_ERROR_SSL || error == SSL_ERROR_SYSCALL) {
 						server_DEBUG(&main_instance, "Client Disconnected");
-						clientTable_remove(&main_instance.client_table, active_fd);
+
+                        serverClient* active_client = clientTable_get(&main_instance.client_table, active_fd);
+						clientTable_remove(
+                            &main_instance.client_table, active_client
+                        );
 						continue;
 					}
 					
@@ -405,7 +431,9 @@ int serverInstance_event_loop(serverOptions options) {
 					CSValue_free(&client_data);
 				} else if (bytes == 0 ) {
 					server_DEBUG(&main_instance, "Client Disconnected");
-					clientTable_remove(&main_instance.client_table, active_fd);
+
+                    serverClient* active_client = clientTable_get(&main_instance.client_table, active_fd);
+					clientTable_remove(&main_instance.client_table, active_client);
 				}
 			}
 		}
