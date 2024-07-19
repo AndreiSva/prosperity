@@ -25,6 +25,7 @@ void CSValue_put(FILE* stream, CSValue* csv);
 
 void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t row);
 void CSValue_append_row(CSValue* csv, ...);
+void CSValue_append_col(CSValue* csv, char* colname, ...);
 
 // parses a valid CSV string
 CSValue CSValue_parse(char* csv_string);

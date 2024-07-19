@@ -34,7 +34,7 @@ char* CSValue_get(CSValue* csv, uint32_t col, uint32_t row) {
 
 int CSValue_index_colbyname(CSValue* csv, char* colname, uint32_t row) {
     for (int col = 0; col < csv->cols; col++) {
-        if (strcmp(CSValue_get(csv, col, row), colname) == 1) {
+        if (strcmp(CSValue_get(csv, col, row), colname) == 0) {
             return col;
         }
     }
@@ -43,7 +43,7 @@ int CSValue_index_colbyname(CSValue* csv, char* colname, uint32_t row) {
 
 int CSValue_index_rowbyname(CSValue* csv, char* rowname, uint32_t col) {
     for (int row = 0; row < csv->rows; row++) {
-        if (strcmp(CSValue_get(csv, col, row), rowname) == 1) {
+        if (strcmp(CSValue_get(csv, col, row), rowname) == 0) {
             return row;
         }
     }
@@ -55,7 +55,7 @@ void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t row) {
 	// if we want to add a cell outside of what we've allocated already, allocate the new memory
 
 	// cols
-	if (csv->cols <= col) {
+	if (csv->cols <= col && col >= 0) {
 		int old_size = csv->cols;
 		csv->cols = col + 1;
 		csv->table = xrealloc(csv->table, sizeof(char**) * csv->cols);
@@ -67,7 +67,7 @@ void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t row) {
 	}
 	
 	// rows
-	if (csv->rows <= row) {
+	if (csv->rows <= row && row >= 0) {
 		int old_size = csv->rows;
 		csv->rows = row + 1;
 		for (int i = 0; i < csv->cols; i++) {
@@ -82,8 +82,7 @@ void CSValue_edit_cell(CSValue* csv, char* cell, uint32_t col, uint32_t row) {
 	}
 
 	free(csv->table[col][row]);
-	char* cell_string = xmalloc(strlen(cell) + 1);
-	strcpy(cell_string, cell);
+	char* cell_string = strdup(cell);
 	csv->table[col][row] = cell_string;
 }
 
@@ -94,18 +93,37 @@ void CSValue_append_row(CSValue* csv, ...) {
     va_list args;
     va_start(args, csv);
 
-    char* cell_value;
-    int row = csv->rows;
-
-    cell_value = va_arg(args, char*);
     int i = 0;
+    char* cell_value = va_arg(args, char*);
+    
     while (cell_value != NULL) {
-        CSValue_edit_cell(csv, cell_value, i, row);
+        CSValue_edit_cell(csv, cell_value, i, csv->rows - 1);
         cell_value = va_arg(args, char*);
         i++;
     }
     
     csv->rows++;
+    va_end(args);
+}
+
+void CSValue_append_col(CSValue* csv, char* colname, ...) {
+    // see CSValue_append_row
+
+    va_list args;
+    va_start(args, colname);
+
+    CSValue_edit_cell(csv, colname, csv->cols - 1, 0);
+
+    int i = 1;
+    char* cell_value = va_arg(args, char*);
+
+    while (cell_value != NULL) {
+        CSValue_edit_cell(csv, cell_value, csv->cols, i);
+        cell_value = va_arg(args, char*);
+        i++;
+    }
+
+    csv->cols++;
     va_end(args);
 }
 
@@ -236,8 +254,10 @@ void CSValue_put(FILE* stream, CSValue* csv) {
 		for (int j = 0; j < csv->cols; j++) {
 			char* cell = CSValue_get(csv, j, i);
 
-			// if our cell contains a comma it means we should quote it
-			bool quoted = strchr(cell, SEP) != NULL;
+			// if our cell contains a comma, newline, or quotes it means we should quote it
+			bool quoted = strchr(cell, SEP) != NULL
+                || strchr(cell, '\n') != NULL
+                || strchr(cell, QUOTE);
 			
 			if (quoted) {
 				fputc(QUOTE, stream);
