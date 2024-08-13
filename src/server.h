@@ -18,41 +18,41 @@ typedef struct sockaddr_in6 net_address;
 
 typedef struct serverClient {
     int sockfd;
-	net_address address;
-	socklen_t addrlen;
-	SSL* ssl_object;
+    net_address address;
+    socklen_t addrlen;
+    SSL* ssl_object;
     struct serverFeed* feed;
     struct serverClient* pnext_serverclient;
 } serverClient;
 
 typedef struct serverFeed {
-	serverClient* client;
+    serverClient* client;
 
     char* feed_name;
-	
-	struct serverFeed* parent_feed;
+    
+    struct serverFeed* parent_feed;
 
-	struct serverFeed* pnext_serverfeed;
-	struct serverFeed* subfeeds;
+    struct serverFeed* pnext_serverfeed;
+    struct serverFeed* subfeeds;
 } serverFeed;
 
 typedef struct {
-	serverClient** clients;
+    serverClient** clients;
 } clientTable;
 
 typedef struct {
-	serverOptions options;
-	int server_sockfd;
-	serverFeed* rootfeed;
-	clientTable client_table;
-	
-	SSL_CTX* sslctx;
-	int epollfd;
+    serverOptions options;
+    int server_sockfd;
+    serverFeed* rootfeed;
+    clientTable client_table;
+    
+    SSL_CTX* sslctx;
+    int epollfd;
 
-	int port;
-	bool running;
+    int port;
+    bool running;
 
-	bool debug_mode;
+    bool debug_mode;
 } serverInstance;
 
 void clientTable_index(clientTable* table, serverClient* client);

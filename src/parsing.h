@@ -10,11 +10,11 @@
 bool isnumber(char* string);
 
 typedef struct {
-	uint32_t cols;
-	uint32_t rows;
+    uint32_t cols;
+    uint32_t rows;
 
-	// table[col][row]
-	char*** table;
+    // table[col][row]
+    char*** table;
 } CSValue;
 
 // returns the value of a cell at <col> and <row>
